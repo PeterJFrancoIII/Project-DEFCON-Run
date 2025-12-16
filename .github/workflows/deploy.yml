@@ -1,0 +1,46 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    # FIXED: We now create the file manually using standard shell commands
+    # instead of using the broken "SpicyPizza" plugin.
+    - name: Create .env.prod
+      run: |
+        echo "DEBUG=0" > .env.prod
+        echo "SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}" >> .env.prod
+        echo "DJANGO_ALLOWED_HOSTS=${{ secrets.SERVER_IP }} localhost 127.0.0.1" >> .env.prod
+        echo "DATABASE=mongodb" >> .env.prod
+        echo "DB_NAME=fpv_market" >> .env.prod
+        echo "DB_USER=admin" >> .env.prod
+        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env.prod
+        echo "DB_HOST=db" >> .env.prod
+        echo "DB_PORT=27017" >> .env.prod
+
+    - name: Copy Files via SCP
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: root
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "."
+        target: "/root/app"
+
+    - name: Execute Deploy Script
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: root
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /root/app
+          chmod +x deploy.sh
+          ./deploy.sh

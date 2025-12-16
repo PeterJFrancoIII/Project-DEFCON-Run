@@ -1,0 +1,14 @@
+# Ignore Database Files
+mongodb_data/
+db_data/
+*.log
+*.sqlite3
+
+# Ignore Python Cache
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Ignore Mac System Files
+.DS_Store
