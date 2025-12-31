@@ -16,3 +16,27 @@ BorderWatch/
 
 # Local Netlify folder
 .netlify
+
+# Large local zip bundles (do not commit)
+Android Frontend.zip
+Website.zip
+
+# Never commit archives
+*.zip
+
+# Flutter/Android build outputs
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/.idea/
+**/*.apk
+**/*.aab
+
+# iOS build outputs
+**/Pods/
+**/.symlinks/
+**/DerivedData/
+
+# Server runtime data
+**/mongodb_data/
+**/*.sqlite3
