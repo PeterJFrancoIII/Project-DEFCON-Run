@@ -1,0 +1,20 @@
+
+Showing Recent Issues
+
+Build target BorderWatch of project BorderWatch with configuration Debug
+
+SwiftCompile normal arm64 Compiling\ ConflictMonitorView.swift /Users/computer/Desktop/DEFCON_Run/BorderWatch/BorderWatch/ConflictMonitorView.swift (in target 'BorderWatch' from project 'BorderWatch')
+
+SwiftCompile normal arm64 /Users/computer/Desktop/DEFCON_Run/BorderWatch/BorderWatch/ConflictMonitorView.swift (in target 'BorderWatch' from project 'BorderWatch')
+    cd /Users/computer/Desktop/DEFCON_Run/BorderWatch
+    
+
+/Users/computer/Desktop/DEFCON_Run/BorderWatch/BorderWatch/ConflictMonitorView.swift:84:53: warning: main actor-isolated conformance of 'ServerResponse' to 'Decodable' cannot be used in nonisolated context; this is an error in the Swift 6 language mode
+                    let decoded = try JSONDecoder().decode(ServerResponse.self, from: data)
+                                                    ^
+
+/Users/computer/Desktop/DEFCON_Run/BorderWatch/BorderWatch/ConflictMonitorView.swift:84:53: Main actor-isolated conformance of 'ServerResponse' to 'Decodable' cannot be used in nonisolated context; this is an error in the Swift 6 language mode
+
+
+
+Build succeeded    12/13/25, 7:00 PM    2.9 seconds

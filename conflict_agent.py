@@ -1,0 +1,228 @@
+"""
+SYSTEM: SENTINEL
+MODULE: conflict_agent.py
+ROLE:   ON-DEMAND TRANSLATION ENGINE
+LOGIC:  
+1. Generate English Master (Heavy Compute) ONLY if missing/stale.
+2. Generate Translations (Light Compute) ONLY if requested & missing.
+"""
+
+import argparse
+import pymongo
+import google.generativeai as genai
+import json
+import feedparser
+import ssl
+import math
+import os
+from datetime import datetime
+
+# CONFIGURATION
+MONGO_URI = "mongodb://localhost:27017/"
+DB_NAME = "BorderConflictDB"
+COLLECTION_NAME = "intel_history"
+GEMINI_API_KEY = "AIzaSyDAqXQXtWm85QakcmQFqOIVQmDR3MjX4Y0"
+ZONE_DB_FILE = "thailand_zones.json"
+
+# HOTZONES
+HOTZONES_DATA = [
+    {"name": "PREAH VIHEAR (ARTILLERY)", "lat": 14.3914, "lon": 104.6804, "radius": 40000},
+    {"name": "POIPET (MORTARS)", "lat": 13.6600, "lon": 102.5000, "radius": 15000},
+    {"name": "CHONG CHOM (ROCKETS)", "lat": 14.4300, "lon": 103.4300, "radius": 35000},
+    {"name": "TRAT (NAVAL GUNS)", "lat": 11.9600, "lon": 102.8000, "radius": 25000}
+]
+
+# AI SETUP
+genai.configure(api_key=GEMINI_API_KEY)
+try:
+    MODEL = genai.GenerativeModel("gemini-3-pro-preview")
+except:
+    print(">> [SYSTEM] Model 'gemini-3-pro-preview' not found. Fallback to 'gemini-pro'.")
+    MODEL = genai.GenerativeModel("gemini-pro")
+
+# --- GEOSPATIAL ENGINE ---
+def haversine_distance(lat1, lon1, lat2, lon2):
+    try:
+        R = 6371 
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat/2) * math.sin(dlat/2) + \
+            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+            math.sin(dlon/2) * math.sin(dlon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
+    except: return 9999.0
+
+class ZoneResolver:
+    @staticmethod
+    def resolve_and_measure(zip_code):
+        if os.path.exists(ZONE_DB_FILE):
+            try:
+                with open(ZONE_DB_FILE, 'r') as f:
+                    db = json.load(f)
+                if zip_code in db:
+                    target = db[zip_code]
+                    t_lat = float(target['lat'])
+                    t_lon = float(target['lon'])
+                    min_dist = 9999.0
+                    nearest_threat = "Unknown"
+                    for zone in HOTZONES_DATA:
+                        dist = haversine_distance(t_lat, t_lon, zone['lat'], zone['lon'])
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_threat = zone['name']
+                    return { "name": target['name'], "lat": t_lat, "lon": t_lon, "distance_km": round(min_dist, 1), "nearest_hotzone": nearest_threat }
+            except: pass
+        return { "name": f"Sector {zip_code}", "lat": 0.0, "lon": 0.0, "distance_km": -1, "nearest_hotzone": "None" }
+
+def fetch_news():
+    if hasattr(ssl, '_create_unverified_context'):
+        ssl._create_default_https_context = ssl._create_unverified_context
+    query = "Thailand Cambodia border conflict OR troop movement OR artillery OR OSINT"
+    url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-US&gl=US&ceid=US:en"
+    feed = feedparser.parse(url)
+    if not feed.entries: return "No major reports."
+    return "\n".join([entry.title for entry in feed.entries[:8]])
+
+# --- GENERATORS ---
+
+def generate_master_intel(zip_code, geo_info, news_text):
+    """ COST: HIGH (Full Analysis). Only runs for English. """
+    dist_info = ""
+    if geo_info['distance_km'] > 0:
+        dist_info = f"TARGET DISTANCE TO THREAT: {geo_info['distance_km']} km (Nearest: {geo_info['nearest_hotzone']})"
+
+    prompt = f"""
+    ACT AS A MILITARY INTELLIGENCE OFFICER.
+    TARGET: {geo_info['name']} (Zip: {zip_code})
+    {dist_info}
+    NEWS: {news_text}
+    
+    TASK: GENERATE SAFETY REPORT (IN ENGLISH).
+    
+    LOGIC:
+    - < 10km: DEFCON 1 (IMMEDIATE DANGER).
+    - 10-40km: DEFCON 2 (HIGH RISK).
+    - 40-100km: DEFCON 3/4 (CAUTION).
+    - > 100km: DEFCON 5 (SAFE).
+    
+    OUTPUT JSON ONLY:
+    {{
+        "defcon_status": (int 1-5),
+        "evacuation_point": {{ "name": "City", "lat": (float), "lon": (float), "reason": "Text" }},
+        "roads_to_avoid": ["Road A"], 
+        "emergency_avoid_locations": ["Zone B"],
+        "summary": ["Bullet 1", "Bullet 2", "Bullet 3", "Bullet 4", "Bullet 5"],
+        "metadata": {{ "threat_velocity": "Rising/Stable", "confidence_score": (int), "source_count": (int) }},
+        "predictive": {{
+            "defcon": (int),
+            "vector_heading": "Advancing/Static",
+            "forecast_trend": "Rising/Falling/Stable",
+            "forecast_summary": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5"],
+            "risk_probability": (int)
+        }}
+    }}
+    """
+    try:
+        resp = MODEL.generate_content(prompt)
+        return json.loads(resp.text.replace("```json", "").replace("```", "").strip())
+    except Exception as e:
+        print(f"[AGENT] Gen Error: {e}")
+        return None
+
+def translate_intel(master_data, target_lang_code):
+    """ COST: LOW (Simple Translation). Runs for TH/KM. """
+    if target_lang_code == "en": return master_data 
+    
+    lang_name = "THAI" if target_lang_code == "th" else "KHMER"
+    
+    prompt = f"""
+    TRANSLATE THE JSON VALUES TO {lang_name}.
+    KEEP KEYS, NUMBERS, AND COORDS UNCHANGED.
+    INPUT JSON:
+    {json.dumps(master_data)}
+    """
+    try:
+        resp = MODEL.generate_content(prompt)
+        return json.loads(resp.text.replace("```json", "").replace("```", "").strip())
+    except Exception as e:
+        print(f"[AGENT] Trans Error: {e}")
+        return master_data
+
+# --- MISSION CONTROL ---
+def run_mission(zip_code, country, target_lang):
+    client = pymongo.MongoClient(MONGO_URI)
+    db = client[DB_NAME]
+    col = db[COLLECTION_NAME]
+    
+    # 1. RETRIEVE DOCUMENT
+    existing_doc = col.find_one({"zip_code": zip_code})
+    
+    master_intel = None
+    needs_save = False
+    
+    # Init Doc if missing
+    if not existing_doc:
+        existing_doc = {
+            "zip_code": zip_code,
+            "country": country,
+            "timestamp": None,
+            "languages": {}
+        }
+
+    # 2. ENSURE ENGLISH MASTER EXISTS (The "Source of Truth")
+    if "en" in existing_doc.get("languages", {}):
+        # We have a master record.
+        master_intel = existing_doc["languages"]["en"]
+        # (Freshness is handled by API Server triggering a force-refresh if needed)
+    else:
+        # We are missing the master. Must Generate.
+        print(f">> [AGENT] Generating Master Intel (EN) for {zip_code}...")
+        geo_info = ZoneResolver.resolve_and_measure(zip_code)
+        news_text = fetch_news()
+        master_intel = generate_master_intel(zip_code, geo_info, news_text)
+        
+        if master_intel:
+            # Inject Fixed Data
+            master_intel["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            master_intel["user_location"] = { "lat": geo_info['lat'], "lon": geo_info['lon'] }
+            master_intel["tactical_overlays"] = HOTZONES_DATA
+            
+            existing_doc["languages"]["en"] = master_intel
+            existing_doc["timestamp"] = datetime.now().isoformat()
+            needs_save = True
+
+    # 3. HANDLE TARGET LANGUAGE (ON DEMAND)
+    if target_lang != "en" and master_intel:
+        # Check if we ALREADY have this translation
+        if target_lang in existing_doc.get("languages", {}):
+            print(f">> [AGENT] {target_lang} translation already exists. Skipping AI.")
+        else:
+            print(f">> [AGENT] Translating Master to {target_lang}...")
+            translated_data = translate_intel(master_intel, target_lang)
+            
+            # Re-inject data AI might have stripped
+            translated_data["tactical_overlays"] = master_intel.get("tactical_overlays")
+            translated_data["user_location"] = master_intel.get("user_location")
+            translated_data["last_updated"] = master_intel.get("last_updated")
+            # Sync trend logic
+            if "predictive" in master_intel and "predictive" in translated_data:
+                 translated_data["predictive"]["forecast_trend"] = master_intel["predictive"].get("forecast_trend")
+            
+            existing_doc["languages"][target_lang] = translated_data
+            needs_save = True
+        
+    # 4. SAVE (Only if we generated something new)
+    if needs_save:
+        col.replace_one({"zip_code": zip_code}, existing_doc, upsert=True)
+        print(f">> [SUCCESS] Updated DB. Languages available: {list(existing_doc['languages'].keys())}")
+    else:
+        print(">> [AGENT] No updates required.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--zip", default="10110")
+    parser.add_argument("--country", default="TH")
+    parser.add_argument("--lang", default="en")
+    args = parser.parse_args()
+    run_mission(args.zip, args.country, args.lang)
