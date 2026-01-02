@@ -1,0 +1,76 @@
+# Ignore Database Files
+mongodb_data/
+db_data/
+*.log
+*.sqlite3
+
+# Ignore Python Cache
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Ignore Mac System Files
+.DS_Store
+BorderWatch/
+
+# Local Netlify folder
+.netlify
+
+# Large local zip bundles (do not commit)
+Android Frontend.zip
+Website.zip
+
+# Never commit archives
+*.zip
+
+# Flutter/Android build outputs
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/.idea/
+**/*.apk
+**/*.aab
+
+# iOS build outputs
+**/Pods/
+**/.symlinks/
+**/DerivedData/
+
+# Server runtime data
+**/mongodb_data/
+**/*.sqlite3
+
+# ---- Generated / huge ----
+**/node_modules/
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/.idea/
+**/*.apk
+**/*.aab
+
+# Flutter / Android build outputs
+**/android/app/build/
+**/build/app/
+
+# Mongo local data
+**/mongodb_data/
+
+# Python
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+.npm/
+
+# Mac
+.DS_Store
+
+# Misc
+.vscode/
+.idea/

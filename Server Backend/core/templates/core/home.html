@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentinel | Risk Intelligence</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
+        .header { border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 4px; border-left: 5px solid #555; }
+        .high { border-left-color: #d32f2f; }
+        .medium { border-left-color: #fbc02d; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SENTINEL // ACTIVE INTELLIGENCE</h1>
+        <p>System Status: ONLINE | Reports: {{ count }}</p>
+    </div>
+    <div class="grid">
+        {% for i in incidents %}
+        <div class="card {{ i.level|lower }}">
+            <h3>{{ i.title }}</h3>
+            <p>{{ i.description }}</p>
+            <small>{{ i.location }} | {{ i.timestamp }}</small>
+        </div>
+        {% empty %}
+        <div class="card">
+            <h3>System Initialized</h3>
+            <p>No active threats detected in the sector.</p>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

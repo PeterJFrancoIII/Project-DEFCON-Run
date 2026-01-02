@@ -1,0 +1,8 @@
+Django>=3.2
+gunicorn
+pymongo
+requests
+google-generativeai
+schedule
+feedparser
+flask
