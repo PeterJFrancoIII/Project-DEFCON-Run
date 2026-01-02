@@ -22,7 +22,11 @@ MONGO_URI = "mongodb://localhost:27017/"
 DB_NAME = "BorderConflictDB"
 COLLECTION_NAME = "intel_history"
 GEMINI_API_KEY = "AIzaSyDAqXQXtWm85QakcmQFqOIVQmDR3MjX4Y0"
-ZONE_DB_FILE = "thailand_zones.json"
+
+# Path relative to this script (Server Backend/scripts/conflict_agent.py)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+INPUTS_DIR = os.path.join(BASE_DIR, 'Developer Inputs')
+ZONE_DB_FILE = os.path.join(INPUTS_DIR, "thailand_zones.json")
 
 # HOTZONES
 HOTZONES_DATA = [

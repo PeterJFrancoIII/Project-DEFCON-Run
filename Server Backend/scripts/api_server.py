@@ -53,17 +53,19 @@ def get_intel():
             # 2. Check Specific Language Availability
             lang_data = doc.get("languages", {}).get(user_lang)
             
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conflict_agent.py")
+
             if is_stale:
                 # Whole record is old. Re-run English Master.
                 print(f">> [SERVER] Stale Data for {user_zip}. Refreshing Master...")
-                subprocess.Popen([sys.executable, "conflict_agent.py", "--zip", user_zip, "--country", user_country, "--lang", "en"])
+                subprocess.Popen([sys.executable, script_path, "--zip", user_zip, "--country", user_country, "--lang", "en"])
                 return jsonify({"status": "calculating", "message": "Updating Intel..."})
                 
             elif not lang_data:
                 # Record is fresh, but we don't have THIS language yet.
                 # Trigger TRANSLATION only.
                 print(f">> [SERVER] Missing {user_lang} for {user_zip}. Translating...")
-                subprocess.Popen([sys.executable, "conflict_agent.py", "--zip", user_zip, "--country", user_country, "--lang", user_lang])
+                subprocess.Popen([sys.executable, script_path, "--zip", user_zip, "--country", user_country, "--lang", user_lang])
                 return jsonify({"status": "calculating", "message": "Translating..."})
                 
             else:
@@ -72,8 +74,9 @@ def get_intel():
         
         else:
             # No Record at all. Start from scratch.
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "conflict_agent.py")
             print(f">> [SERVER] New Sector: {user_zip}. Initializing...")
-            subprocess.Popen([sys.executable, "conflict_agent.py", "--zip", user_zip, "--country", user_country, "--lang", "en"])
+            subprocess.Popen([sys.executable, script_path, "--zip", user_zip, "--country", user_country, "--lang", "en"])
             return jsonify({"status": "calculating", "message": "Initializing..."})
             
     except Exception as e:
