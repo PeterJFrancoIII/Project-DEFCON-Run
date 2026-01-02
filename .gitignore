@@ -56,3 +56,21 @@ Website.zip
 
 # Mongo local data
 **/mongodb_data/
+
+# Python
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+.npm/
+
+# Mac
+.DS_Store
+
+# Misc
+.vscode/
+.idea/
