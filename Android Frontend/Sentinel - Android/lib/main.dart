@@ -77,29 +77,29 @@ class Loc {
       "km": "កម្រិតទាប៖ ការល្បាតព្រំដែនធម្មតា"
     },
     "READY_1": {
-      "en": "READINESS: IMMEDIATE",
-      "th": "ความพร้อม: ทันที",
-      "km": "ការត្រៀមខ្លួន៖ ភ្លាមៗ"
+      "en": "MAINTAIN READINESS: IMMEDIATE EVACUATION",
+      "th": "ความพร้อม: อพยพทันที",
+      "km": "ត្រៀមខ្លួន៖ ជម្លៀសជាបន្ទាន់"
     },
     "READY_2": {
-      "en": "READINESS: 15 MINUTES",
-      "th": "ความพร้อม: 15 นาที",
-      "km": "ការត្រៀមខ្លួន៖ ១៥ នាទី"
+      "en": "MAINTAIN READINESS: 1 HOUR",
+      "th": "ความพร้อม: 1 ชั่วโมง",
+      "km": "ត្រៀមខ្លួន៖ ១ ម៉ោង"
     },
     "READY_3": {
-      "en": "READINESS: 6 HOURS",
+      "en": "MAINTAIN READINESS: 6 HOURS",
       "th": "ความพร้อม: 6 ชั่วโมง",
-      "km": "ការត្រៀមខ្លួន៖ ៦ ម៉ោង"
+      "km": "ត្រៀមខ្លួន៖ ៦ ម៉ោង"
     },
     "READY_4": {
-      "en": "READINESS: 24 HOURS",
+      "en": "MAINTAIN READINESS: 24 HOURS",
       "th": "ความพร้อม: 24 ชั่วโมง",
-      "km": "ការត្រៀមខ្លួន៖ ២៤ ម៉ោង"
+      "km": "ត្រៀមខ្លួន៖ ២៤ ម៉ោង"
     },
     "READY_5": {
-      "en": "READINESS: STANDARD",
-      "th": "ความพร้อม: ปกติ",
-      "km": "ការត្រៀមខ្លួន៖ ធម្មតា"
+      "en": "MAINTAIN READINESS: RELAXED",
+      "th": "ความพร้อม: ผ่อนคลาย",
+      "km": "ត្រៀមខ្លួន៖ សម្រាក"
     },
     "EVACUATION_POINT": {
       "en": "NEAREST EVACUATION POINT",
@@ -241,6 +241,11 @@ class IntelDetails {
   final String? locationName;
   final String? zipCode;
   final List<SourceMetadata> sources;
+  final bool isCertified;
+  final String? analystModel;
+  final String? translatorModel;
+  final String? systemUrl;
+
   const IntelDetails(
       {required this.defconStatus,
       this.trend,
@@ -255,31 +260,13 @@ class IntelDetails {
       this.threatDistanceKm,
       this.locationName,
       this.zipCode,
-      required this.sources});
+      this.sources = const [],
+      this.isCertified = true,
+      this.analystModel,
+      this.translatorModel,
+      this.systemUrl});
 
   factory IntelDetails.fromJson(Map<String, dynamic> json) {
-    // MOCK SOURCES IF EMPTY (FOR APP STORE COMPLIANCE)
-    List<SourceMetadata> parsedSources = (json['sources'] as List?)
-            ?.map((i) => SourceMetadata.fromJson(i))
-            .toList() ??
-        [];
-    if (parsedSources.isEmpty) {
-      parsedSources = [
-        const SourceMetadata(
-            publisher: "Google News RSS",
-            title: "Regional Conflict Aggregation",
-            url: "https://news.google.com"),
-        const SourceMetadata(
-            publisher: "OSINT Framework",
-            title: "Verified Social Intelligence",
-            url: "https://osintframework.com"),
-        const SourceMetadata(
-            publisher: "Gov Travel Advisory",
-            title: "Official Safety Warnings",
-            url: "https://travel.state.gov"),
-      ];
-    }
-
     return IntelDetails(
         defconStatus: json['defcon_status'] ?? 5,
         trend: json['trend'],
@@ -302,7 +289,13 @@ class IntelDetails {
         threatDistanceKm: (json['threat_distance_km'] as num?)?.toDouble(),
         locationName: json['location_name'],
         zipCode: json['zip_code'],
-        sources: parsedSources);
+        sources: (json['sources'] as List<dynamic>? ?? [])
+            .map((e) => SourceMetadata.fromJson(e))
+            .toList(),
+        isCertified: json['is_certified'] ?? true,
+        analystModel: json['analyst_model'],
+        translatorModel: json['translator_model'],
+        systemUrl: json['system_url']);
   }
 }
 
@@ -334,19 +327,24 @@ class ThreatZone {
   final double lon;
   final double radius;
   final String? type;
+  final String? lastKinetic;
+
   const ThreatZone(
       {required this.name,
       required this.lat,
       required this.lon,
       required this.radius,
-      this.type});
+      this.type,
+      this.lastKinetic});
+
   factory ThreatZone.fromJson(Map<String, dynamic> json) {
     return ThreatZone(
         name: json['name'] ?? "Unknown Threat",
         lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
         lon: (json['lon'] as num?)?.toDouble() ?? 0.0,
         radius: (json['radius'] as num?)?.toDouble() ?? 1000.0,
-        type: json['type']);
+        type: json['type'],
+        lastKinetic: json['last_kinetic']);
   }
 }
 
@@ -398,16 +396,16 @@ class SentinelProvider with ChangeNotifier {
 
     // EPHEMERAL ID ROTATION (PDPA COMPLIANCE)
     bool needsRotation = false;
-    if (createdStr.isEmpty)
+    if (createdStr.isEmpty) {
       needsRotation = true;
-    else {
+    } else {
       final created = DateTime.parse(createdStr);
       final age = DateTime.now().difference(created);
       if (age.inHours > 24) needsRotation = true;
     }
 
     if (sentinelID.isEmpty || needsRotation) {
-      print(">> [PDPA] Rotating Ephemeral ID");
+      debugPrint(">> [PDPA] Rotating Ephemeral ID");
       sentinelID = const Uuid().v4();
       await prefs.setString('SentinelID', sentinelID);
       await prefs.setString('IDCreatedDate', DateTime.now().toIso8601String());
@@ -578,20 +576,22 @@ Color _getGlobalDefconColor(int level) {
 }
 
 Widget _buildTrendWidget(String? trend) {
-  if (trend == "rising")
+  if (trend == "rising") {
     return const Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.arrow_upward, color: Colors.red, size: 16),
       Text(" RISING",
           style: TextStyle(
               color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))
     ]);
-  if (trend == "falling")
+  }
+  if (trend == "falling") {
     return const Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.arrow_downward, color: Colors.green, size: 16),
       Text(" FALLING",
           style: TextStyle(
               color: Colors.green, fontWeight: FontWeight.bold, fontSize: 14))
     ]);
+  }
   return const Row(mainAxisSize: MainAxisSize.min, children: [
     Icon(Icons.remove, color: Colors.grey, size: 16),
     Text(" STABLE",
@@ -627,7 +627,9 @@ class _LandingPageState extends State<LandingPage> {
 
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url)) throw Exception('Could not launch $url');
+    if (!await launchUrl(url)) {
+      throw Exception('Could not launch $url');
+    }
   }
 
   void _showSupportDialog() {
@@ -651,6 +653,18 @@ class _LandingPageState extends State<LandingPage> {
                     GestureDetector(
                         onTap: () => _launchURL("mailto:$_supportEmail"),
                         child: const Text(_supportEmail,
+                            style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline))),
+                    const SizedBox(height: 10),
+                    const Text("Official Website:",
+                        style: TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                        onTap: () => _launchURL(
+                            "https://sentinelcivilianriskanalysis.netlify.app"),
+                        child: const Text(
+                            "sentinelcivilianriskanalysis.netlify.app",
                             style: TextStyle(
                                 color: Colors.blue,
                                 decoration: TextDecoration.underline))),
@@ -871,7 +885,6 @@ class _DashboardPageState extends State<DashboardPage>
           data: data, lang: vm.userLang, pulseAnimation: _pulseAnimation),
       ForecastView(data: data, lang: vm.userLang),
       MapTab(data: data, lang: vm.userLang),
-      SourcesView(data: data, lang: vm.userLang),
       SystemView(vm: vm, data: data)
     ];
 
@@ -949,9 +962,6 @@ class _DashboardPageState extends State<DashboardPage>
               label: Loc.tr("OUTLOOK", vm.userLang)),
           BottomNavigationBarItem(
               icon: const Icon(Icons.map), label: Loc.tr("MAP", vm.userLang)),
-          BottomNavigationBarItem(
-              icon: const Icon(Icons.source),
-              label: Loc.tr("SOURCES", vm.userLang)),
           const BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: "SYSTEM"),
         ],
@@ -960,66 +970,8 @@ class _DashboardPageState extends State<DashboardPage>
   }
 }
 
-// --- TAB 4: SOURCES (NEW COMPLIANCE TAB) ---
-class SourcesView extends StatelessWidget {
-  final IntelDetails data;
-  final String lang;
-  const SourcesView({required this.data, required this.lang, super.key});
-
-  Future<void> _launch(String url) async {
-    final Uri uri = Uri.parse(url);
-    if (!await launchUrl(uri)) throw Exception('Could not launch $uri');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: Colors.grey[900],
-          child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("VERIFIED INTELLIGENCE SOURCES",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1)),
-                SizedBox(height: 5),
-                Text(
-                    "Sentinel is a news aggregator. Intelligence is derived from the following sources for this specific report:",
-                    style: TextStyle(color: Colors.grey, fontSize: 10))
-              ])),
-      Expanded(
-          child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: data.sources.length,
-              itemBuilder: (ctx, i) {
-                final s = data.sources[i];
-                return Card(
-                    color: const Color(0xFF1A1A1A),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: const Icon(Icons.article, color: Colors.blue),
-                      title: Text(s.publisher,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(s.title,
-                          style:
-                              const TextStyle(color: Colors.grey, fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      trailing: IconButton(
-                          icon: const Icon(Icons.open_in_new,
-                              color: Colors.yellow),
-                          onPressed: () => _launch(s.url)),
-                    ));
-              }))
-    ]);
-  }
-}
+// --- REPLACED SOURCES VIEW WITH NOTHING ---
+// --- (SourcesView Removed) ---
 
 // --- TAB 1: SITREP ---
 class SitRepView extends StatelessWidget {
@@ -1061,16 +1013,20 @@ class SitRepView extends StatelessWidget {
 
   Future<void> _launchMap(String type, double lat, double lon) async {
     String url = "";
-    if (type == "OSM") url = "osmandmaps://?lat=$lat&lon=$lon";
-    if (type == "Google")
+    if (type == "OSM") {
+      url = "osmandmaps://?lat=$lat&lon=$lon";
+    }
+    if (type == "Google") {
       url = "https://www.google.com/maps/dir/?api=1&destination=$lat,$lon";
+    }
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      if (type == "OSM")
+      if (type == "OSM") {
         launchUrl(Uri.parse(
             "https://play.google.com/store/apps/details?id=net.osmand"));
+      }
     }
   }
 
@@ -1104,13 +1060,17 @@ class SitRepView extends StatelessWidget {
                       animation: pulseAnimation,
                       builder: (context, child) => CustomPaint(
                           painter: IOSRingPainter(
-                              color: _getGlobalDefconColor(data.defconStatus),
+                              color: !data.isCertified && data.defconStatus <= 2
+                                  ? Colors.white
+                                  : _getGlobalDefconColor(data.defconStatus),
                               defcon: data.defconStatus,
                               pulse: pulseAnimation.value)))),
               Column(children: [
                 Text(Loc.tr("DEFCON", lang),
                     style: TextStyle(
-                        color: _getGlobalDefconColor(data.defconStatus),
+                        color: !data.isCertified && data.defconStatus <= 2
+                            ? Colors.white
+                            : _getGlobalDefconColor(data.defconStatus),
                         fontWeight: FontWeight.bold,
                         fontSize: 16)),
                 AnimatedBuilder(
@@ -1120,15 +1080,38 @@ class SitRepView extends StatelessWidget {
                             fontSize: 90,
                             fontWeight: FontWeight.w900,
                             fontFamily: 'Courier',
-                            color: _getGlobalDefconColor(data.defconStatus),
-                            shadows: data.defconStatus <= 2
+                            color: !data.isCertified && data.defconStatus <= 2
+                                ? Colors.white
+                                : _getGlobalDefconColor(data.defconStatus),
+                            shadows: data.defconStatus <= 2 && data.isCertified
                                 ? [
                                     BoxShadow(
                                         color: Colors.red,
                                         blurRadius: 20 * pulseAnimation.value)
                                   ]
                                 : []))),
-                _buildTrendWidget(data.trend)
+                // NEW: Certification Label
+                if (data.defconStatus <= 2)
+                  Container(
+                      margin: const EdgeInsets.only(top: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                          border: Border.all(
+                              color: !data.isCertified
+                                  ? Colors.white
+                                  : _getGlobalDefconColor(data.defconStatus)),
+                          borderRadius: BorderRadius.circular(4)),
+                      child: Text(
+                          !data.isCertified ? "UNCERTIFIED" : "CERTIFIED",
+                          style: TextStyle(
+                              color: !data.isCertified
+                                  ? Colors.white
+                                  : _getGlobalDefconColor(data.defconStatus),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 2))),
+                if (data.defconStatus > 2) _buildTrendWidget(data.trend)
               ])
             ]),
           )),
@@ -1142,7 +1125,10 @@ class SitRepView extends StatelessWidget {
                   border: Border.all(
                       color: _getGlobalDefconColor(data.defconStatus))),
               child: Column(children: [
-                Text(Loc.tr("ACTION_${data.defconStatus}", lang),
+                Text(
+                    data.defconStatus <= 2 && !data.isCertified
+                        ? "PENDING VERIFICATION"
+                        : Loc.tr("ACTION_${data.defconStatus}", lang),
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1299,8 +1285,9 @@ class ForecastView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.predictive == null)
+    if (data.predictive == null) {
       return const Center(child: Text("No Intel Available"));
+    }
     final pred = data.predictive!;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1449,18 +1436,24 @@ class _MapTabState extends State<MapTab> {
 
       markers.add(Marker(
           width: 120,
-          height: 60,
+          height: 80, // Increased height for date
           point: LatLng(t.lat, t.lon),
           child: Column(children: [
             Icon(Icons.warning, color: color, size: 30),
             Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 color: Colors.black,
-                child: Text(type,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold)))
+                child: Column(children: [
+                  Text(type,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold)),
+                  if (t.lastKinetic != null)
+                    Text(t.lastKinetic!,
+                        style:
+                            const TextStyle(color: Colors.yellow, fontSize: 6))
+                ]))
           ])));
     }
 
@@ -1560,6 +1553,14 @@ class SystemView extends StatelessWidget {
     if (!await launchUrl(url)) throw Exception('Could not launch $url');
   }
 
+  Future<void> _launchWeb(String? url) async {
+    if (url == null) return;
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri)) {
+      throw Exception('Could not launch $uri');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(padding: const EdgeInsets.all(16), children: [
@@ -1567,16 +1568,35 @@ class SystemView extends StatelessWidget {
         Icon(Icons.dns, color: Colors.green),
         SizedBox(width: 10),
         Text("SYSTEM DIAGNOSTICS",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white))
       ]),
       const SizedBox(height: 20),
       _sysRow("SENTINEL ID", vm.sentinelID, Colors.green),
-      _sysRow("VERSION", "V172", Colors.white),
-      _sysRow("DATE", "2025-12-27", Colors.white),
-      _sysRow("ANALYST", "GEMINI 3.0 PRO", Colors.white),
-      _sysRow("DATA SOURCES", "Google RSS, OSINT, Local Reports", Colors.white),
-      _sysRow("LAST UPDATE", data.lastUpdated ?? "N/A", Colors.white),
+      _sysRow("VERSION", "V173", Colors.white),
+      _sysRow("DATE", "2026-01-03", Colors.white),
+      _sysRow("ANALYST", data.analystModel ?? "GEMINI 3.0 PRO", Colors.white),
+      _sysRow("TRANSLATOR", data.translatorModel ?? "GEMINI 2.0 FLASH",
+          Colors.white),
+      _sysRow("DATA SOURCES", "Google RSS, OSINT", Colors.white),
+      _sysRow("LAST UPDATE", _formatTime(data.lastUpdated), Colors.white),
       const SizedBox(height: 20),
+      if (data.systemUrl != null && data.systemUrl!.isNotEmpty) ...[
+        GestureDetector(
+            onTap: () => _launchWeb(data.systemUrl),
+            child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: Colors.blue[900],
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Center(
+                    child: Text("VISIT WEBSITE",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1))))),
+        const SizedBox(height: 10),
+      ],
       GestureDetector(
           onTap: () => _launchEmail(_supportEmail),
           child: Container(
@@ -1613,6 +1633,16 @@ class SystemView extends StatelessWidget {
                   style: TextStyle(color: valColor, fontFamily: 'Courier'),
                   softWrap: true))
         ]));
+  }
+
+  String _formatTime(String? iso) {
+    if (iso == null) return "N/A";
+    try {
+      final dt = DateTime.parse(iso).toUtc();
+      return "${DateFormat("MM/dd/yy HH:mm").format(dt)} UTC";
+    } catch (e) {
+      return iso;
+    }
   }
 }
 

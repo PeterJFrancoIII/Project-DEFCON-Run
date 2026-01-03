@@ -17,32 +17,33 @@ Do not rely solely on distance. You must evaluate the **NATURE** of the threat.
 * **Action:** Immediate Danger.
 
 **DEFCON 2 (SEVERE / IMMINENT)**
-* **Triggers:** Verified troop accumulation, artillery positioning, or ultimatum issued within 15-40km. Or, active combat in neighboring district.
-* **Keyword Signals:** "Mobilizing", "Artillery Range", "Evacuation Order", "Surrounded".
+* **Triggers:** VERIFIED VISUAL CONFIRMATION of Battalion-sized troop movement within 20km. Active Artillery/Mortar Fire impacting civilian sectors.
+* **Exclusion:** Do NOT trigger Defcon 2 for Drone surveillance or unverified reports.
+* **Keyword Signals:** "Mobilizing", "Artillery Impact", "Evacuation Order", "Surrounded".
 * **Action:** Prepare to Evacuate.
 
 **DEFCON 3 (ELEVATED / CAUTION)**
-* **Triggers:** Credible reports of movement > 40km. Unverified reports of skirmishes nearby. Regional instability.
+* **Triggers:** Credible reports of movement > 40km. Drone Swarms. Border skirmishes.
 * **Action:** Heightened Awareness.
-
-**DEFCON 4 (GUARDED)**
-* **Triggers:** Political tension, rhetorical threats, or military exercises. No kinetic activity within 100km.
-
-**DEFCON 5 (NORMAL)**
-* **Triggers:** Routine operations. No credible threats.
 
 ---
 
 ### **2. GEOSPATIAL LOGIC (MAPPING)**
 * **Evacuation Point:** Must be a specific City or District **away** from the threat vector. Do not suggest generic fields. Calculate the opposite cardinal direction of the threat.
-* **Roads to Avoid:** Identify specific Highway Numbers (e.g., "Route 304", "AH1") if mentioned or inferable. If not, describe the vector (e.g., "All roads leading North").
+* **Roads to Avoid:** Identify specific Highway Numbers (e.g., "Route 304", "AH1") if mentioned or inferable.
 * **Avoid Locations:** Be specific (e.g., "Border Crossing Point Aranyaprathet", "Military Base X").
 
 ---
 
-### **3. PREDICTIVE MODELING**
+### **3. PREDICTIVE MODELING (HISTORICAL CONTEXT)**
+* **Requirement:** Apply knowledge of regional military history and current geopolitical stance.
 * **Threat Velocity:** Is the conflict spreading (Rising) or contained (Stable)?
-* **Vector Heading:** If troops are moving, are they moving TOWARD or AWAY from the target?
+* **Forecast**: You MUST provide a **"forecast_bullets"** array in the JSON with EXACTLY 5 strings.
+    1. **Political**: Government stability, diplomatic statements, martial law declarations.
+    2. **Military**: Troop movements, heavy weapon calibrations, ROE changes.
+    3. **Civilian**: Impact on non-combatants, evacuation status, panic levels.
+    4. **Economic**: Border trade status, market closures, currency fluctuations.
+    5. **Diplomatic**: International response, embassy warnings, ceasefire talks.
 
 ---
 
@@ -73,6 +74,14 @@ Return ONLY valid JSON. No markdown formatting. No preamble.
     "forecast_defcon": (Integer),
     "threat_vector": "Approaching/Receding/Static",
     "confidence_score": (Integer 1-100),
-    "risk_window": "Next 12-24 Hours"
+    "risk_window": "Next 12-24 Hours",
+    "historical_context": "Brief historical parallel.",
+    "forecast_bullets": [
+      "1. Political: ...",
+      "2. Military: ...",
+      "3. Civilian: ...",
+      "4. Economic: ...",
+      "5. Diplomatic: ..."
+    ]
   }}
 }}

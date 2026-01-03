@@ -162,6 +162,22 @@ def api_save_api_config(request):
         return JsonResponse({'status': 'saved'})
     return JsonResponse({'error': 'POST'})
 
+def get_config_path(): return os.path.join(INPUTS_DIR, 'config.json')
+
+def api_get_config(request):
+    try:
+        with open(get_config_path(), 'r') as f: data = json.load(f)
+        return JsonResponse(data)
+    except: return JsonResponse({})
+
+@csrf_exempt
+def api_save_config(request):
+    if request.method == 'POST':
+        payload = json.loads(request.body)
+        with open(get_config_path(), 'w') as f: json.dump(payload, f, indent=4)
+        return JsonResponse({'status': 'saved'})
+    return JsonResponse({'error': 'POST required'})
+
 # --- API: ALERTS & APPROVALS ---
 
 def api_get_approvals(request):
@@ -215,3 +231,36 @@ def api_save_alert_map(request):
         db.intel_history.update_one({'zip_code': zip_code}, {'$set': updates})
         return JsonResponse({'status': 'updated'})
     return JsonResponse({'error': 'POST'})
+
+# --- API: LIVE THREATS MAP ---
+from core.geo_utils import HOTZONES_DATA
+
+def api_get_threats(request):
+    """Return processed hotzones matching App logic."""
+    processed = []
+    
+    for zone in HOTZONES_DATA:
+        # Clone to avoid mutating global state if we were editing in place
+        z = zone.copy()
+        
+        name_lower = z['name'].lower()
+        # Default fallback
+        radius = 5000 
+        
+        # LOGIC FROM main.dart MapTab
+        if "artillery" in name_lower or "mortar" in name_lower:
+            radius = 20000
+        elif "infantry" in name_lower or "troop" in name_lower:
+             radius = 5000
+        elif "armor" in name_lower or "tank" in name_lower:
+             radius = 10000
+        elif "rocket" in name_lower or "missile" in name_lower:
+             radius = 40000
+        elif "air" in name_lower or "strike" in name_lower:
+             radius = 50000
+        
+        # Override file radius with "Story" radius
+        z['radius'] = radius
+        processed.append(z)
+
+    return JsonResponse({'threats': processed})

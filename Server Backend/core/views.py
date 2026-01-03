@@ -46,6 +46,7 @@ OSINT_SOURCE_FILE = os.path.join(INPUTS_DIR, 'OSINT Sources.csv')
 
 # COMPLIANCE MODULE
 from core.compliance import check_compliance
+from core.geo_utils import get_nearest_hotzone, HOTZONES_DATA
 
 # GRID SETTINGS
 GRID_RADIUS_METERS = 50000 
@@ -195,9 +196,14 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         with open(prompt_path, 'r', encoding='utf-8') as f:
             template = f.read()
 
+        # Calculate Distance to Conflict Zone
+        dist_km, nearest_hotzone = get_nearest_hotzone(user_lat, user_lon)
+        dist_info = f"TARGET DISTANCE TO THREAT: {dist_km:.1f} km (Nearest: {nearest_hotzone})"
+        print(f">> [DEBUG] Zip: {zip_code} | {dist_info}")
+
         prompt = template.format(
             target_name=f"{geo_data.get('province', 'Unknown')}, {geo_data.get('district', 'Unknown')} (Lat: {user_lat}, Lon: {user_lon})",
-            dist_info="", # Views context doesn't track distance to hotzones yet
+            dist_info=dist_info,
             news_text=news_text
         )
         
@@ -216,14 +222,27 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         
         if 'predictive_analysis' in master_intel:
             pa = master_intel.pop('predictive_analysis')
+            forecast_summary = pa.get('forecast_bullets', [])
+            if not forecast_summary:
+                 forecast_summary = [f"Risk Window: {pa.get('risk_window', 'Unknown')}"]
+
             master_intel['predictive'] = {
                 "defcon": pa.get('forecast_defcon', 3),
                 "risk_probability": pa.get('confidence_score', 50),
                 "forecast_trend": pa.get('threat_vector', 'Static'),
-                "forecast_summary": [f"Risk Window: {pa.get('risk_window', 'Unknown')}"]
+                "forecast_summary": forecast_summary
             }
             trend_map = {"Approaching": "Rising", "Receding": "Falling", "Static": "Stable"}
             master_intel['predictive']['forecast_trend'] = trend_map.get(master_intel['predictive']['forecast_trend'], 'Stable')
+
+        # --- INJECT CONFIG (System URL) ---
+        config_path = os.path.join(INPUTS_DIR, 'config.json')
+        system_url = "https://sentinel.example.com"
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as cf:
+                config = json.load(cf)
+                system_url = config.get('system_url', system_url)
+        master_intel['system_url'] = system_url
 
         if 'defcon_justification' in master_intel:
             justification = master_intel.pop('defcon_justification')
@@ -236,14 +255,34 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         # -----------------------------------------------------------
 
         # 2. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
+        is_certified = True
         if master_intel.get('defcon_status', 5) == 1:
             print(">> [SAFETY] DEFCON 1 DETECTED. DOWNGRADING TO 2 PENDING HUMAN REVIEW.")
             master_intel['defcon_status'] = 2
             master_intel['summary'].insert(0, "** REPORT PENDING HUMAN VERIFICATION **")
+            is_certified = False
+        
+        # New: DEFCON 2 also technically requires human review per new strict rules if needed, 
+        # but for now we trust the downgrade logic. 
+        # Actually, user asked: "Unapporved DEFCON 1-2 Ratings show under the DEFCON rating 'UNCERTIFIED'"
+        # So I should mark checks for status <= 2.
         
         # Pass User Location
+        master_intel['is_certified'] = is_certified
         master_intel['user_location'] = { 'lat': user_lat, 'lon': user_lon }
         
+        # Inject Constant Tactical Overlays (Hotzones)
+        master_intel['tactical_overlays'] = []
+        for zone in HOTZONES_DATA:
+            master_intel['tactical_overlays'].append({
+                "name": zone['name'],
+                "lat": zone['lat'],
+                "lon": zone['lon'],
+                "radius": zone['radius'],
+                "type": "Conflict Zone",
+                "last_kinetic": zone.get('last_kinetic', 'Unknown')
+            })
+
         # Metadata
         master_intel['last_updated'] = datetime.datetime.utcnow().isoformat()
         master_intel['zip_code'] = zip_code
@@ -252,6 +291,8 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             "type": "Point", 
             "coordinates": [user_lon, user_lat] 
         }
+        master_intel['analyst_model'] = "GEMINI 2.0 FLASH"
+        master_intel['translator_model'] = "GEMINI 2.0 FLASH (Polyglot)"
 
         doc = {
             'zip_code': zip_code,

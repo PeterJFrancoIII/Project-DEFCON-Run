@@ -86,6 +86,11 @@
                 </button>
             </li>
             <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#live-threats">
+                    <i class="bi bi-radar"></i> Live Threat Matrix
+                </button>
+            </li>
+            <li class="nav-item">
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#intel">
                     <i class="bi bi-cpu"></i> Intelligence Parameters
                 </button>
@@ -123,14 +128,29 @@
                 </div>
             </div>
 
+            <!-- 1.5 LIVE THREATS TAB -->
+            <div class="tab-pane fade" id="live-threats">
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="text-danger"><i class="bi bi-activity"></i> Active Kinetic Zones & Threats</h5>
+                        <div id="threat-map"
+                            style="height: 600px; width: 100%; border: 1px solid #d9534f; border-radius: 4px;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 2. INTELLIGENCE TAB -->
             <div class="tab-pane fade" id="intel">
                 <div class="row">
                     <div class="col-md-6">
                         <h5>Military Analyst Prompt</h5>
-                        <p class="text-muted small">Edit the System Prompt given to the Geo-Spatial AI.</p>
-                        <textarea id="prompt-editor" class="sys-editor"></textarea>
-                        <button class="btn btn-success mt-2" onclick="savePrompt()">Update Prompt</button>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-lock-fill"></i> <strong>EDITING DISABLED</strong><br>
+                            To prevent module corruption, direct prompt editing is restricted in this console.<br>
+                            Contact System Administrator for kernel-level changes.
+                        </div>
+                        <!-- <textarea id="prompt-editor" class="sys-editor" disabled></textarea> -->
+                        <!-- <button class="btn btn-success mt-2" onclick="savePrompt()" disabled>Update Prompt</button> -->
                     </div>
                     <div class="col-md-6">
                         <h5>OSINT Sources</h5>
@@ -205,8 +225,13 @@
             <div class="tab-pane fade" id="config">
                 <div class="row">
                     <div class="col-md-4">
-                        <h5>API Configuration</h5>
-                        <textarea id="api-config-editor" class="code-editor" style="height: 200px;"></textarea>
+                        <h5>System Configuration</h5>
+                        <textarea id="system-config-editor" class="code-editor" style="height: 200px;"></textarea>
+                        <button class="btn btn-warning btn-sm mt-2" onclick="saveSystemConfig()">Update Config</button>
+
+                        <hr>
+                        <h5>API Keys (Backend)</h5>
+                        <textarea id="api-config-editor" class="code-editor" style="height: 150px;"></textarea>
                         <button class="btn btn-info btn-sm mt-2" onclick="saveApiConfig()">Update Keys</button>
 
                         <hr>
@@ -240,9 +265,11 @@
             // Load other tabs data on demand or init
             loadApprovals();
             loadAlerts();
-            loadPrompt();
             loadOSINT();
             loadConfigAndContact();
+            // initThreatMap handles its own data fetch when tab is clicked? 
+            // Better to init it once.
+            initThreatMap();
         });
 
         function initMap() {
@@ -354,8 +381,14 @@
         async function loadConfigAndContact() {
             const c = await (await fetch('/api/admin/contact')).json();
             document.getElementById('contact-editor').value = JSON.stringify(c, null, 4);
-            const a = await (await fetch('/api/admin/config')).json();
+            const a = await (await fetch('/api/admin/api_config')).json();
             document.getElementById('api-config-editor').value = a.content;
+            const s = await (await fetch('/api/admin/config')).json();
+            document.getElementById('system-config-editor').value = JSON.stringify(s, null, 4);
+        }
+        async function saveSystemConfig() {
+            await fetch('/api/admin/config/save', { method: 'POST', body: document.getElementById('system-config-editor').value });
+            alert('System Config Saved.');
         }
         async function saveContact() {
             await fetch('/api/admin/contact/save', { method: 'POST', body: document.getElementById('contact-editor').value });
@@ -370,6 +403,43 @@
             fd.append('logo', document.getElementById('logo-input').files[0]);
             await fetch('/api/admin/logo/upload', { method: 'POST', body: fd });
             alert('Logo Uploaded.');
+        }
+
+        // --- LIVE THREAT MAP ---
+        async function initThreatMap() {
+            // Delay slightly to ensure tab render
+            const threatMap = L.map('threat-map').setView([13.5, 102.0], 8);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: 'Sentinel Kinetic',
+                className: 'map-tiles'
+            }).addTo(threatMap);
+
+            // Fix tile loading on tab switch
+            const tabEl = document.querySelector('button[data-bs-target="#live-threats"]');
+            tabEl.addEventListener('shown.bs.tab', function (event) {
+                threatMap.invalidateSize();
+            });
+
+            // Fetch Data
+            try {
+                const res = await fetch('/api/admin/threats');
+                const data = await res.json();
+
+                (data.threats || []).forEach(t => {
+                    const circle = L.circle([t.lat, t.lon], {
+                        color: 'red',
+                        fillColor: '#f03',
+                        fillOpacity: 0.5,
+                        radius: t.radius || 10000
+                    }).addTo(threatMap);
+
+                    circle.bindPopup(`
+                        <strong style="color:red">${t.name}</strong><br>
+                        Radius: ${t.radius}m<br>
+                        Last Event: ${t.last_kinetic || 'Unknown'}
+                    `);
+                });
+            } catch (e) { console.error("Threat Map Error", e); }
         }
 
     </script>
