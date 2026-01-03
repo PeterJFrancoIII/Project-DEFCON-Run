@@ -45,6 +45,13 @@ HOTZONES_DATA = [
     {"name": "TRAT (NAVAL GUNS)", "lat": 11.9600, "lon": 102.8000, "radius": 25000}
 ]
 
+# ROYAL ZONES (NULL ZONES - STRICT LIABILITY)
+ROYAL_ZONES = [
+    {"name": "GRAND PALACE", "lat": 13.7500, "lon": 100.4913, "radius": 5000},
+    {"name": "CHITRALADA", "lat": 13.7711, "lon": 100.5218, "radius": 5000},
+    {"name": "KLALAI KANGWON", "lat": 12.5700, "lon": 99.9600, "radius": 5000},
+]
+
 # AI SETUP
 genai.configure(api_key=GEMINI_API_KEY)
 try:
@@ -138,7 +145,16 @@ def generate_master_intel(zip_code, geo_info, news_text):
     """
     try:
         resp = MODEL.generate_content(prompt)
-        return json.loads(resp.text.replace("```json", "").replace("```", "").strip())
+        text = resp.text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+        
+        # 1. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
+        if data.get('defcon_status', 5) == 1:
+            print(">> [SAFETY] DEFCON 1 DETECTED. DOWNGRADING TO 2 PENDING HUMAN REVIEW.")
+            data['defcon_status'] = 2
+            data['summary'].insert(0, "** REPORT PENDING HUMAN VERIFICATION **")
+
+        return data
     except Exception as e:
         print(f"[AGENT] Gen Error: {e}")
         return None
@@ -192,8 +208,27 @@ def run_mission(zip_code, country, target_lang):
         # We are missing the master. Must Generate.
         print(f">> [AGENT] Generating Master Intel (EN) for {zip_code}...")
         geo_info = ZoneResolver.resolve_and_measure(zip_code)
-        news_text = fetch_news()
-        master_intel = generate_master_intel(zip_code, geo_info, news_text)
+
+        # 2. ROYAL ZONE CHECK
+        for zone in ROYAL_ZONES:
+            dist = haversine_distance(geo_info['lat'], geo_info['lon'], zone['lat'], zone['lon'])
+            if dist * 1000 <= zone['radius']:
+                print(f">> [LEGAL] Location in Restricted Royal Zone ({zone['name']}). Aborting.")
+                # Save a SAFE placeholder
+                master_intel = {
+                     "defcon_status": 5,
+                     "location_name": zone['name'],
+                     "summary": ["Location is in a Restricted Safety Zone.", "Intel services unavailable in this sector."],
+                     "evacuation_point": {"name": "N/A", "lat": 0.0, "lon": 0.0, "reason": "Restricted"},
+                     "roads_to_avoid": [],
+                     "emergency_avoid_locations": [],
+                     "predictive": { "defcon": 5, "forecast_summary": ["Zone Secure"], "risk_probability": 0 }
+                }
+                break
+        
+        if not master_intel:
+             news_text = fetch_news()
+             master_intel = generate_master_intel(zip_code, geo_info, news_text)
         
         if master_intel:
             # Inject Fixed Data

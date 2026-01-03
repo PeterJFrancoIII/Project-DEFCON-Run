@@ -48,6 +48,25 @@ OSINT_SOURCE_FILE = os.path.join(INPUTS_DIR, 'OSINT Sources.csv')
 GRID_RADIUS_METERS = 50000 
 STALE_THRESHOLD_SECONDS = 14400 
 
+# ROYAL ZONES (COMPLIANCE)
+ROYAL_ZONES = [
+    {"name": "GRAND PALACE", "lat": 13.7500, "lon": 100.4913, "radius": 5000},
+    {"name": "CHITRALADA", "lat": 13.7711, "lon": 100.5218, "radius": 5000},
+    {"name": "KLALAI KANGWON", "lat": 12.5700, "lon": 99.9600, "radius": 5000},
+]
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    try:
+        R = 6371 
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat/2) * math.sin(dlat/2) + \
+            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+            math.sin(dlon/2) * math.sin(dlon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
+    except: return 9999.0
+
 # --- CONCURRENCY CONTROL ---
 MISSION_QUEUE = {} 
 
@@ -149,6 +168,38 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         
         user_lat = geo_data['lat']
         user_lon = geo_data['lon']
+
+        # 1. ROYAL ZONE CHECK (PRE-GENERATION)
+        for zone in ROYAL_ZONES:
+            dist = haversine_distance(user_lat, user_lon, zone['lat'], zone['lon'])
+            if dist * 1000 <= zone['radius']:
+                print(f">> [LEGAL] Restricted Zone ({zone['name']}). Aborting Generation.")
+                # Create Safe Placeholder
+                doc = {
+                    'zip_code': zip_code,
+                    'country': country,
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'location_geo': { "type": "Point", "coordinates": [user_lon, user_lat] }, 
+                    'languages': { 
+                        'en': {
+                            "defcon_status": 5,
+                            "location_name": zone['name'],
+                            "summary": ["Location is in a Restricted Safety Zone.", "Intel services unavailable in this sector."],
+                            "evacuation_point": {"name": "N/A", "lat": 0.0, "lon": 0.0, "reason": "Restricted"},
+                            "roads_to_avoid": [],
+                            "emergency_avoid_locations": [],
+                            "predictive": { "defcon": 5, "forecast_summary": ["Zone Secure"], "risk_probability": 0 },
+                            "last_updated": datetime.datetime.utcnow().isoformat(),
+                            "zip_code": zip_code,
+                            "user_location": { 'lat': user_lat, 'lon': user_lon },
+                            "tactical_overlays": [],
+                            "location_geo": { "type": "Point", "coordinates": [user_lon, user_lat] }
+                        }
+                    } 
+                }
+                col.replace_one({'zip_code': zip_code}, doc, upsert=True)
+                return
+
         news_text = fetch_news()
 
         # Load Prompt from Developer Inputs
@@ -168,6 +219,12 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         resp = ANALYST_MODEL.generate_content(prompt)
         cleaned = resp.text.replace('```json', '').replace('```', '').strip()
         master_intel = json.loads(cleaned)
+
+        # 2. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
+        if master_intel.get('defcon_status', 5) == 1:
+            print(">> [SAFETY] DEFCON 1 DETECTED. DOWNGRADING TO 2 PENDING HUMAN REVIEW.")
+            master_intel['defcon_status'] = 2
+            master_intel['summary'].insert(0, "** REPORT PENDING HUMAN VERIFICATION **")
         
         # Pass User Location
         master_intel['user_location'] = { 'lat': user_lat, 'lon': user_lon }

@@ -42,9 +42,9 @@ class Loc {
   static const Map<String, Map<String, String>> dict = {
     "SUBTITLE": {
       "en":
-          "Real-Time Civilian Risk Intelligence from Regional Conflicts & Instability",
-      "th": "ระบบอัจฉริยะเพื่อความปลอดภัยของพลเรือนจากความขัดแย้งในภูมิภาค",
-      "km": "ប្រព័ន្ធស៊ើបអង្កេតហានិភ័យស៊ីវិលពីជម្លោះក្នុងតំបន់"
+          "Real-Time News & Risk Analysis from Regional Conflicts & Instability",
+      "th": "ข่าวและวิเคราะห์ความเสี่ยงจากความขัดแย้งในภูมิภาค",
+      "km": "ព័ត៌មាននិងការវិភាគហានិភ័យពីជម្លោះក្នុងតំបន់"
     },
     "DEFCON": {
       "en": "DEFCON",
@@ -52,9 +52,9 @@ class Loc {
       "km": "កម្រិតការពារ"
     },
     "ACTION_1": {
-      "en": "WAR IMMINENT: IMMEDIATE EVACUATION REQUIRED.",
-      "th": "สงครามใกล้ปะทุ: อพยพทันที",
-      "km": "សង្គ្រាមជិតមកដល់៖ ជម្លៀសចេញជាបន្ទាន់"
+      "en": "EXTREME DANGER: FOLLOW LOCAL NEWS ADVISORIES.",
+      "th": "อันตรายสูงสุด: โปรดติดตามข่าวสารท้องถิ่น",
+      "km": "គ្រោះថ្នាក់ខ្លាំង៖ សូមតាមដានព័ត៌មានក្នុងស្រុក"
     },
     "ACTION_2": {
       "en": "SEVERE: ARTILLERY / MORTAR ACTIVITY DETECTED.",
@@ -394,9 +394,23 @@ class SentinelProvider with ChangeNotifier {
   Future<void> _loadInitData() async {
     final prefs = await SharedPreferences.getInstance();
     sentinelID = prefs.getString('SentinelID') ?? "";
-    if (sentinelID.isEmpty) {
+    String createdStr = prefs.getString('IDCreatedDate') ?? "";
+
+    // EPHEMERAL ID ROTATION (PDPA COMPLIANCE)
+    bool needsRotation = false;
+    if (createdStr.isEmpty)
+      needsRotation = true;
+    else {
+      final created = DateTime.parse(createdStr);
+      final age = DateTime.now().difference(created);
+      if (age.inHours > 24) needsRotation = true;
+    }
+
+    if (sentinelID.isEmpty || needsRotation) {
+      print(">> [PDPA] Rotating Ephemeral ID");
       sentinelID = const Uuid().v4();
       await prefs.setString('SentinelID', sentinelID);
+      await prefs.setString('IDCreatedDate', DateTime.now().toIso8601String());
     }
     userZip = prefs.getString('SavedZip') ?? "";
     notifyListeners();
