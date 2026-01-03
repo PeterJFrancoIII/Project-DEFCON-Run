@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from . import views
-from . import admin_views
+import portal_views as admin_views
 
 urlpatterns = [
     # The Visual Dashboard

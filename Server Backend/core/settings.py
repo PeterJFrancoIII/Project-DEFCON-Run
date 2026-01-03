@@ -2,6 +2,9 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Add Root/Admin Console to Python Path
+import sys
+sys.path.append(str(BASE_DIR.parent / "Admin Console"))
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-test-key')
 DEBUG = bool(int(os.environ.get('DEBUG', 1)))
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*'] # Allow all IPs for now
@@ -31,7 +34,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],
+        'DIRS': [BASE_DIR / "templates", BASE_DIR.parent / "Admin Console" / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

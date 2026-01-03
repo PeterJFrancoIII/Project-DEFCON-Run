@@ -7,12 +7,12 @@ import csv
 import sys
 import shutil
 from datetime import datetime
-from .db_utils import get_db_handle
+from core.db_utils import get_db_handle
 
 # --- CONFIGURATIONPaths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INPUTS_DIR = os.path.join(BASE_DIR, 'Developer Inputs')
-STATIC_DIR = os.path.join(BASE_DIR, 'core', 'static', 'core') # Adjust as needed
+INPUTS_DIR = os.path.join(BASE_DIR, 'Server Backend', 'Developer Inputs')
+STATIC_DIR = os.path.join(BASE_DIR, 'Server Backend', 'core', 'static', 'core') # Adjust as needed
 
 # --- HELPERS ---
 def get_zones_csv_path(): return os.path.join(INPUTS_DIR, 'Thailand', 'Thailand_Exclusary_Zones.csv')
