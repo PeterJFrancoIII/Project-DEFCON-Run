@@ -1,10 +1,12 @@
 import os
 import csv
 import math
+import sys
+from shapely.geometry import Point, box, Polygon
 
 # ==============================================================================
 # MODULE: compliance.py
-# ROLE:   Regulatory Compliance & Exclusion Zones
+# ROLE:   Regulatory Compliance & Exclusion Zones (Shapely Engine)
 # ==============================================================================
 
 # Map Country Code (ISO 2) to Folder Name
@@ -15,100 +17,104 @@ COUNTRY_MAP = {
     'LA': 'Laos'
 }
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    try:
-        R = 6371 # Earth Radius in km
-        dlat = math.radians(lat2 - lat1)
-        dlon = math.radians(lon2 - lon1)
-        a = math.sin(dlat/2) * math.sin(dlat/2) + \
-            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
-            math.sin(dlon/2) * math.sin(dlon/2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        return R * c
-    except: return 9999.0
+class ComplianceEngine:
+    _instance = None
+    _zones = {} # Map country -> List of shapes
 
-import re
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = ComplianceEngine()
+        return cls._instance
 
-def parse_rtf_csv_lines(file_path):
-    """
-    Parses a messy RTF file that contains CSV data.
-    """
-    clean_lines = []
-    capture = False
-    try:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            lines = f.readlines()
-            
-        for line in lines:
-            # 1. Cleaning: Remove RTF control words (e.g., \f0, \par, \cf0)
-            # Regex: Backslash + alphanumeric words + optional space
-            clean = re.sub(r'\\[a-z0-9]+ ?', '', line).strip()
-            
-            # 2. Cleaning: Remove braces and lingering backslashes
-            clean = clean.replace('{', '').replace('}', '').replace('\\', '').strip()
-            
-            # 3. Detect Header to start capturing
-            if 'zone_name,latitude' in clean:
-                capture = True
-            
-            if capture and clean:
-                clean_lines.append(clean)
-            
-    except Exception as e:
-        print(f"[COMPLIANCE] File Read Error {file_path}: {e}")
+    def load_zones_for_country(self, country_code, inputs_dir):
+        if country_code in self._zones:
+            return # Already loaded
         
-    return clean_lines
-
-def load_zones_from_file(file_path):
-    zones = []
-    lines = parse_rtf_csv_lines(file_path)
-    if not lines: return []
-
-    try:
-        # Assume first valid line is header
-        reader = csv.DictReader(lines)
-        for row in reader:
-            # Flexible Key Matching
-            lat = row.get('latitude') or row.get('lat')
-            lon = row.get('longitude') or row.get('lon')
-            rad = row.get('radius_km') or row.get('radius')
-            name = row.get('zone_name') or row.get('name') or "Restricted Zone"
-            
-            if lat and lon and rad:
-                zones.append({
-                    'name': name,
-                    'lat': float(lat),
-                    'lon': float(lon),
-                    'radius_km': float(rad),
-                    'risk': row.get('risk_level', 'HIGH')
-                })
-    except Exception as e:
-        print(f"[COMPLIANCE] CSV Parse Error {file_path}: {e}")
+        folder_name = COUNTRY_MAP.get(country_code, 'Thailand')
+        target_dir = os.path.join(inputs_dir, folder_name)
         
-    return zones
+        if not os.path.exists(target_dir):
+            print(f"[COMPLIANCE] Warning: Directory not found: {target_dir}")
+            return
 
-def check_compliance(lat, lon, country_code, inputs_dir):
-    """
-    Returns (is_blocked, zone_details)
-    """
-    folder_name = COUNTRY_MAP.get(country_code, 'Thailand') # Default to Thailand folder if unknown? or just fail safe.
-    target_dir = os.path.join(inputs_dir, folder_name)
-    
-    if not os.path.exists(target_dir):
-        # Fallback: maybe the folder doesn't exist yet for other countries
-        return False, None
-    
-    # 1. Scan for Zone Files
-    zone_files = [f for f in os.listdir(target_dir) if "Exclusary_Zones" in f]
-    
-    for fname in zone_files:
-        full_path = os.path.join(target_dir, fname)
-        zones = load_zones_from_file(full_path)
+        loaded_zones = []
+        
+        # Look for the Shapely CSV first
+        csv_files = [f for f in os.listdir(target_dir) if "Exclusary_Zones.csv" in f]
+        
+        for fname in csv_files:
+            full_path = os.path.join(target_dir, fname)
+            print(f">> [COMPLIANCE] Loading zones from {fname}")
+            
+            try:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        shape = self._create_shape(row)
+                        if shape:
+                            loaded_zones.append({
+                                'name': row.get('zone_name', 'Unknown'),
+                                'shape': shape,
+                                'risk': row.get('risk_level', 'HIGH')
+                            })
+            except Exception as e:
+                print(f"[COMPLIANCE] Error parsing {fname}: {e}")
+
+        self._zones[country_code] = loaded_zones
+        print(f">> [COMPLIANCE] Total Active Zones for {country_code}: {len(loaded_zones)}")
+
+    def _create_shape(self, row):
+        try:
+            shape_type = row.get('shape_type', 'CIRCLE').strip().upper()
+            
+            if shape_type == 'RECTANGLE':
+                # box(minx, miny, maxx, maxy)
+                # minx = West (lng), maxx = East (lng)
+                # miny = South (lat), maxy = North (lat)
+                # CSV has NW and SE.
+                # NW: (lat, lng) -> MaxY, MinX
+                # SE: (lat, lng) -> MinY, MaxX
+                nw_lat = float(row['bound_nw_lat'])
+                nw_lng = float(row['bound_nw_lng'])
+                se_lat = float(row['bound_se_lat'])
+                se_lng = float(row['bound_se_lng'])
+                
+                return box(nw_lng, se_lat, se_lng, nw_lat)
+                
+            elif shape_type == 'CIRCLE':
+                lat = float(row.get('lat_center') or row.get('latitude'))
+                lng = float(row.get('lng_center') or row.get('longitude'))
+                radius_km = float(row.get('radius_km') or row.get('radius'))
+                
+                # Convert KM to Degrees (Approximate)
+                # 1 degree lat ~= 111 km. 1 degree lon ~= 111 * cos(lat). Assuming 111 for safety/simplicity or using simple conversion.
+                deg_radius = radius_km / 111.32
+                
+                return Point(lng, lat).buffer(deg_radius)
+                
+        except Exception as e:
+            print(f"[COMPLIANCE] Shape Creation Error: {e} | Row: {row}")
+            return None
+        return None
+
+    def check_point(self, lat, lon, country_code):
+        zones = self._zones.get(country_code, [])
+        user_point = Point(lon, lat)
         
         for zone in zones:
-            dist = haversine_distance(lat, lon, zone['lat'], zone['lon'])
-            if dist <= zone['radius_km']:
-                print(f">> [COMPLIANCE] BLOCKED: {zone['name']} (Dist: {dist:.2f}km <= {zone['radius_km']}km)")
+            if zone['shape'].contains(user_point) or zone['shape'].intersects(user_point):
                 return True, zone
-                
+        return False, None
+
+# Helper Wrapper for Views/Scripts
+def check_compliance(lat, lon, country_code, inputs_dir):
+    engine = ComplianceEngine.get_instance()
+    # Lazy Load
+    engine.load_zones_for_country(country_code, inputs_dir)
+    
+    is_blocked, zone = engine.check_point(lat, lon, country_code)
+    if is_blocked:
+         print(f">> [COMPLIANCE] BLOCKED: {zone['name']}")
+         return True, zone
     return False, None
