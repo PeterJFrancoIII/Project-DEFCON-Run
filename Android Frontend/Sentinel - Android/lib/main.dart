@@ -42,7 +42,7 @@ class Loc {
   static const Map<String, Map<String, String>> dict = {
     "SUBTITLE": {
       "en":
-          "Real-Time News & Risk Analysis from Regional Conflicts & Instability",
+          "Real-Time Civilian Risk Intelligence from Regional Conflicts & Instability",
       "th": "ข่าวและวิเคราะห์ความเสี่ยงจากความขัดแย้งในภูมิภาค",
       "km": "ព័ត៌មាននិងការវិភាគហានិភ័យពីជម្លោះក្នុងតំបន់"
     },

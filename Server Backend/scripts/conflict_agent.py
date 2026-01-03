@@ -37,19 +37,18 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INPUTS_DIR = os.path.join(BASE_DIR, 'Developer Inputs')
 ZONE_DB_FILE = os.path.join(INPUTS_DIR, "thailand_zones.json")
 
+# --- SETUP PATHS ---
+sys.path.append(BASE_DIR)
+
+# DYNAMIC COMPLIANCE
+from core.compliance import check_compliance
+
 # HOTZONES
 HOTZONES_DATA = [
     {"name": "PREAH VIHEAR (ARTILLERY)", "lat": 14.3914, "lon": 104.6804, "radius": 40000},
     {"name": "POIPET (MORTARS)", "lat": 13.6600, "lon": 102.5000, "radius": 15000},
     {"name": "CHONG CHOM (ROCKETS)", "lat": 14.4300, "lon": 103.4300, "radius": 35000},
     {"name": "TRAT (NAVAL GUNS)", "lat": 11.9600, "lon": 102.8000, "radius": 25000}
-]
-
-# ROYAL ZONES (NULL ZONES - STRICT LIABILITY)
-ROYAL_ZONES = [
-    {"name": "GRAND PALACE", "lat": 13.7500, "lon": 100.4913, "radius": 5000},
-    {"name": "CHITRALADA", "lat": 13.7711, "lon": 100.5218, "radius": 5000},
-    {"name": "KLALAI KANGWON", "lat": 12.5700, "lon": 99.9600, "radius": 5000},
 ]
 
 # AI SETUP
@@ -209,26 +208,25 @@ def run_mission(zip_code, country, target_lang):
         print(f">> [AGENT] Generating Master Intel (EN) for {zip_code}...")
         geo_info = ZoneResolver.resolve_and_measure(zip_code)
 
-        # 2. ROYAL ZONE CHECK
-        for zone in ROYAL_ZONES:
-            dist = haversine_distance(geo_info['lat'], geo_info['lon'], zone['lat'], zone['lon'])
-            if dist * 1000 <= zone['radius']:
-                print(f">> [LEGAL] Location in Restricted Royal Zone ({zone['name']}). Aborting.")
-                # Save a SAFE placeholder
-                master_intel = {
-                     "defcon_status": 5,
-                     "location_name": zone['name'],
-                     "summary": ["Location is in a Restricted Safety Zone.", "Intel services unavailable in this sector."],
-                     "evacuation_point": {"name": "N/A", "lat": 0.0, "lon": 0.0, "reason": "Restricted"},
-                     "roads_to_avoid": [],
-                     "emergency_avoid_locations": [],
-                     "predictive": { "defcon": 5, "forecast_summary": ["Zone Secure"], "risk_probability": 0 }
-                }
-                break
-        
         if not master_intel:
-             news_text = fetch_news()
-             master_intel = generate_master_intel(zip_code, geo_info, news_text)
+             # 1. DYNAMIC COMPLIANCE CHECK (Exclusion Zones)
+             is_blocked, zone_info = check_compliance(geo_info['lat'], geo_info['lon'], country, INPUTS_DIR)
+             if is_blocked:
+                print(f">> [LEGAL] Restricted Zone ({zone_info['name']}). Aborting Generation.")
+                # Create Safe Placeholder
+                master_intel = {
+                    "defcon_status": 5,
+                    "location_name": zone_info['name'],
+                    "summary": ["Location is in a Restricted Exclusion Zone.", "Intel services unavailable in this sector per local regulations."],
+                    "evacuation_point": {"name": "N/A", "lat": 0.0, "lon": 0.0, "reason": "Restricted"},
+                    "roads_to_avoid": [],
+                    "emergency_avoid_locations": [],
+                    "predictive": { "defcon": 5, "forecast_summary": ["Zone Secure"], "risk_probability": 0 }
+                }
+
+             else:
+                news_text = fetch_news()
+                master_intel = generate_master_intel(zip_code, geo_info, news_text)
         
         if master_intel:
             # Inject Fixed Data
