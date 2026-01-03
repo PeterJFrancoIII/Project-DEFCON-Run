@@ -130,6 +130,42 @@ def generate_master_intel(zip_code, geo_info, news_text):
         resp = MODEL.generate_content(prompt)
         text = resp.text.replace("```json", "").replace("```", "").strip()
         data = json.loads(text)
+
+        # --- SCHEMA NORMALIZATION (New Prompt -> Old App Schema) ---
+        # 1. Map 'sitrep_summary' -> 'summary'
+        if 'sitrep_summary' in data:
+            data['summary'] = data.pop('sitrep_summary')
+        
+        # 2. Map 'tactical_map' -> 'roads_to_avoid' & 'emergency_avoid_locations'
+        if 'tactical_map' in data:
+            tm = data.pop('tactical_map')
+            data['roads_to_avoid'] = tm.get('roads_to_avoid', [])
+            data['emergency_avoid_locations'] = tm.get('danger_zones', [])
+
+        # 3. Map 'predictive_analysis' -> 'predictive'
+        if 'predictive_analysis' in data:
+            pa = data.pop('predictive_analysis')
+            data['predictive'] = {
+                "defcon": pa.get('forecast_defcon', 3),
+                "risk_probability": pa.get('confidence_score', 50),
+                "forecast_trend": pa.get('threat_vector', 'Static'),
+                "forecast_summary": [f"Risk Window: {pa.get('risk_window', 'Unknown')}"]
+            }
+            # Map terminology
+            trend_map = {"Approaching": "Rising", "Receding": "Falling", "Static": "Stable"}
+            data['predictive']['forecast_trend'] = trend_map.get(data['predictive']['forecast_trend'], 'Stable')
+
+        # 4. Integrate 'defcon_justification'
+        if 'defcon_justification' in data:
+            justification = data.pop('defcon_justification')
+            if 'summary' not in data: data['summary'] = []
+            data['summary'].insert(0, f"ASSESSMENT: {justification}")
+        
+        # Ensure Critical Keys Exist for App
+        if 'summary' not in data: data['summary'] = ["No Intel Summary."]
+        if 'defcon_status' not in data: data['defcon_status'] = 5
+
+        # -----------------------------------------------------------
         
         # 1. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
         if data.get('defcon_status', 5) == 1:

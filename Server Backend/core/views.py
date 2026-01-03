@@ -205,6 +205,36 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         cleaned = resp.text.replace('```json', '').replace('```', '').strip()
         master_intel = json.loads(cleaned)
 
+        # --- SCHEMA NORMALIZATION (New Prompt -> Old App Schema) ---
+        if 'sitrep_summary' in master_intel:
+            master_intel['summary'] = master_intel.pop('sitrep_summary')
+        
+        if 'tactical_map' in master_intel:
+            tm = master_intel.pop('tactical_map')
+            master_intel['roads_to_avoid'] = tm.get('roads_to_avoid', [])
+            master_intel['emergency_avoid_locations'] = tm.get('danger_zones', [])
+        
+        if 'predictive_analysis' in master_intel:
+            pa = master_intel.pop('predictive_analysis')
+            master_intel['predictive'] = {
+                "defcon": pa.get('forecast_defcon', 3),
+                "risk_probability": pa.get('confidence_score', 50),
+                "forecast_trend": pa.get('threat_vector', 'Static'),
+                "forecast_summary": [f"Risk Window: {pa.get('risk_window', 'Unknown')}"]
+            }
+            trend_map = {"Approaching": "Rising", "Receding": "Falling", "Static": "Stable"}
+            master_intel['predictive']['forecast_trend'] = trend_map.get(master_intel['predictive']['forecast_trend'], 'Stable')
+
+        if 'defcon_justification' in master_intel:
+            justification = master_intel.pop('defcon_justification')
+            if 'summary' not in master_intel: master_intel['summary'] = []
+            master_intel['summary'].insert(0, f"ASSESSMENT: {justification}")
+        
+        # Ensure Keys
+        if 'summary' not in master_intel: master_intel['summary'] = ["No Intel Summary."]
+        if 'defcon_status' not in master_intel: master_intel['defcon_status'] = 5
+        # -----------------------------------------------------------
+
         # 2. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
         if master_intel.get('defcon_status', 5) == 1:
             print(">> [SAFETY] DEFCON 1 DETECTED. DOWNGRADING TO 2 PENDING HUMAN REVIEW.")
