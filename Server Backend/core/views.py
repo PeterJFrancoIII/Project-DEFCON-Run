@@ -28,10 +28,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INPUTS_DIR = os.path.join(BASE_DIR, 'Developer Inputs')
 
 # Dynamic Import for API Key
+import sys
+if INPUTS_DIR not in sys.path:
+    sys.path.append(INPUTS_DIR)
+
 try:
-    spec = importlib.util.spec_from_file_location("api_config", os.path.join(INPUTS_DIR, "api_config.py"))
-    api_config = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(api_config)
+    import api_config
+    import importlib
+    importlib.reload(api_config)
     GEMINI_API_KEY = api_config.GEMINI_API_KEY
 except Exception as e:
     print(f"[!] Error loading API Config: {e}")
