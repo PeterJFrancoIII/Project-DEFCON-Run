@@ -31,5 +31,5 @@ echo "     http://$LAN_IP:8000"
 echo "----------------------------------------------------------------"
 
 # 3. Run server on 0.0.0.0 (All Interfaces)
-python manage.py runserver 0.0.0.0:8000
+python3 manage.py runserver 0.0.0.0:8000
 
