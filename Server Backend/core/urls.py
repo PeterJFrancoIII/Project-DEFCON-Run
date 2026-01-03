@@ -13,11 +13,27 @@ urlpatterns = [
     # --- ADMIN PORTAL ---
     path('admin_portal', admin_views.admin_home, name='admin_home'),
     
-    # --- ADMIN API ---
+    # --- ADMIN API: ZONES ---
     path('api/admin/zones', admin_views.api_get_zones, name='api_get_zones'),
     path('api/admin/zones/save', admin_views.api_save_zones, name='api_save_zones'),
+    
+    # --- ADMIN API: INTELLIGENCE ---
+    path('api/admin/prompt', admin_views.api_get_prompt, name='api_get_prompt'),
+    path('api/admin/prompt/save', admin_views.api_save_prompt, name='api_save_prompt'),
+    path('api/admin/osint', admin_views.api_get_osint, name='api_get_osint'),
+    path('api/admin/osint/save', admin_views.api_save_osint, name='api_save_osint'),
+    path('api/admin/zips/search', admin_views.api_search_zips, name='api_search_zips'),
+    
+    # --- ADMIN API: ASSETS & CONFIG ---
+    path('api/admin/contact', admin_views.api_get_contact, name='api_get_contact'),
+    path('api/admin/contact/save', admin_views.api_save_contact, name='api_save_contact'),
+    path('api/admin/logo/upload', admin_views.api_upload_logo, name='api_upload_logo'),
+    path('api/admin/config', admin_views.api_get_api_config, name='api_get_api_config'),
+    path('api/admin/config/save', admin_views.api_save_api_config, name='api_save_api_config'),
+
+    # --- ADMIN API: OPS ---
     path('api/admin/approvals', admin_views.api_get_approvals, name='api_get_approvals'),
     path('api/admin/approvals/decide', admin_views.api_decide_approval, name='api_decide_approval'),
-    path('api/admin/config', admin_views.api_get_config, name='api_get_config'),
-    path('api/admin/config/save', admin_views.api_save_config, name='api_save_config'),
+    path('api/admin/alerts', admin_views.api_get_active_alerts, name='api_get_active_alerts'),
+    path('api/admin/alerts/save', admin_views.api_save_alert_map, name='api_save_alert_map'),
 ]

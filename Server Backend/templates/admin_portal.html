@@ -1,279 +1,378 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sentinel Admin Portal</title>
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
     <style>
-        body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; }
-        .nav-tabs .nav-link { color: #aaa; }
-        .nav-tabs .nav-link.active { background-color: #1e1e1e; color: #fff; border-color: #333 #333 #1e1e1e; }
-        #map { height: 600px; width: 100%; border-radius: 4px; }
-        .btn-approve { background-color: #28a745; color: white; }
-        .btn-reject { background-color: #dc3545; color: white; }
-        textarea { background-color: #2d2d2d; color: #0f0; font-family: monospace; border: 1px solid #444; width: 100%; height: 400px; }
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+        }
+
+        .nav-tabs .nav-link {
+            color: #aaa;
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: #1e1e1e;
+            color: #d9534f;
+            border-color: #333 #333 #1e1e1e;
+            font-weight: bold;
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 4px;
+        }
+
+        textarea.code-editor {
+            background-color: #2d2d2d;
+            color: #0db9d7;
+            font-family: monospace;
+            border: 1px solid #444;
+            width: 100%;
+            height: 400px;
+            padding: 10px;
+        }
+
+        textarea.sys-editor {
+            background-color: #2d2d2d;
+            color: #0f0;
+            font-family: monospace;
+            border: 1px solid #444;
+            width: 100%;
+            height: 400px;
+            padding: 10px;
+        }
+
+        .table-dark {
+            --bs-table-bg: #1e1e1e;
+        }
+
+        .tab-pane {
+            padding-top: 20px;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="container-fluid mt-3">
-    <div class="row">
-        <div class="col-12">
-            <h2 class="mb-3 text-danger"><i class="bi bi-shield-lock"></i> SENTINEL COMMAND :: ADMIN PORTAL</h2>
-            
-            <ul class="nav nav-tabs" id="myTab" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active" id="zones-tab" data-bs-toggle="tab" data-bs-target="#zones" type="button">Exclusion Zones (Map)</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="approval-tab" data-bs-toggle="tab" data-bs-target="#approvals" type="button">Approvals (HITL)</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button">Configuration</button>
-                </li>
-            </ul>
-            
-            <div class="tab-content p-3 border border-top-0 card" id="myTabContent">
-                
-                <!-- ZONES MAP TAB -->
-                <div class="tab-pane fade show active" id="zones" role="tabpanel">
-                    <div class="row">
-                        <div class="col-md-9">
-                            <div id="map"></div>
+    <div class="container-fluid py-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="text-danger"><i class="bi bi-shield-lock-fill"></i> SENTINEL COMMAND</h2>
+            <span class="badge bg-secondary">System Online</span>
+        </div>
+
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#zones">
+                    <i class="bi bi-map"></i> Exclusion Zones (Map)
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#intel">
+                    <i class="bi bi-cpu"></i> Intelligence Parameters
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ops">
+                    <i class="bi bi-exclamation-triangle"></i> Active Ops & Approvals
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#config">
+                    <i class="bi bi-gear"></i> Assets & Config
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content border border-top-0 p-3 card">
+
+            <!-- 1. ZONES TAB -->
+            <div class="tab-pane fade show active" id="zones">
+                <div class="row">
+                    <div class="col-md-9">
+                        <div id="map"></div>
+                    </div>
+                    <div class="col-md-3">
+                        <h5 class="text-danger">Restricted Zones (CSV)</h5>
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-outline-success btn-sm" onclick="saveZones()">💾 Save
+                                Changes</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadZones()">🔄 Reload</button>
                         </div>
-                        <div class="col-md-3">
-                            <h5>Zone Controls</h5>
-                            <button class="btn btn-primary w-100 mb-2" onclick="saveZones()">💾 Save Changes to CSV</button>
-                            <button class="btn btn-secondary w-100 mb-2" onclick="loadZones()">🔄 Reload from CSV</button>
-                            <hr>
-                            <div id="zone-list" style="max-height: 500px; overflow-y: auto;">
-                                <!-- Zone items will go here -->
-                            </div>
-                        </div>
+                        <h6>Existing Zones:</h6>
+                        <div id="zone-list" class="small overflow-auto" style="height: 500px;"></div>
                     </div>
                 </div>
-
-                <!-- APPROVALS TAB -->
-                <div class="tab-pane fade" id="approvals" role="tabpanel">
-                   <h5>Pending DEFCON 1 Alerts</h5>
-                   <button class="btn btn-sm btn-secondary" onclick="loadApprovals()">Refresh</button>
-                   <table class="table table-dark table-striped mt-2">
-                       <thead>
-                           <tr>
-                               <th>Zip Code</th>
-                               <th>Location</th>
-                               <th>Current Status</th>
-                               <th>Summary</th>
-                               <th>Actions</th>
-                           </tr>
-                       </thead>
-                       <tbody id="approval-table">
-                           <!-- JS populated -->
-                       </tbody>
-                   </table>
-                </div>
-
-                <!-- CONFIG TAB -->
-                <div class="tab-pane fade" id="config" role="tabpanel">
-                    <h5>API Config (api_config.py)</h5>
-                    <button class="btn btn-primary mb-2" onclick="saveConfig()">Save Config</button>
-                    <textarea id="config-editor"></textarea>
-                </div>
-
             </div>
+
+            <!-- 2. INTELLIGENCE TAB -->
+            <div class="tab-pane fade" id="intel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Military Analyst Prompt</h5>
+                        <p class="text-muted small">Edit the System Prompt given to the Geo-Spatial AI.</p>
+                        <textarea id="prompt-editor" class="sys-editor"></textarea>
+                        <button class="btn btn-success mt-2" onclick="savePrompt()">Update Prompt</button>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>OSINT Sources</h5>
+                        <div class="table-responsive" style="max-height: 250px;">
+                            <table class="table table-dark table-sm small">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>URL</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="osint-table"></tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-outline-light btn-sm mt-1" onclick="loadOSINT()">Refresh OSINT</button>
+
+                        <hr>
+                        <h5>Known Zip Codes</h5>
+                        <div class="input-group mb-2">
+                            <input type="text" id="zip-search" class="form-control bg-dark text-light"
+                                placeholder="Search Zip or District...">
+                            <button class="btn btn-primary" onclick="searchZips()">Search</button>
+                        </div>
+                        <ul id="zip-results" class="list-group"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. OPS TAB -->
+            <div class="tab-pane fade" id="ops">
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <h5 class="text-warning"><i class="bi bi-shield-exclamation"></i> PENDING APPROVALS (HITL)</h5>
+                        <table class="table table-dark table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Zip</th>
+                                    <th>Location</th>
+                                    <th>Summary</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="approvals-table">
+                                <tr>
+                                    <td colspan="4">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="loadApprovals()">Refresh
+                            Queue</button>
+                    </div>
+
+                    <div class="col-12">
+                        <h5><i class="bi bi-activity"></i> Active Alerts (Database)</h5>
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Zip</th>
+                                    <th>DEFCON</th>
+                                    <th>Last Update</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-table"></tbody>
+                        </table>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="loadAlerts()">Refresh Alerts</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. CONFIG TAB -->
+            <div class="tab-pane fade" id="config">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h5>API Configuration</h5>
+                        <textarea id="api-config-editor" class="code-editor" style="height: 200px;"></textarea>
+                        <button class="btn btn-info btn-sm mt-2" onclick="saveApiConfig()">Update Keys</button>
+
+                        <hr>
+                        <h5>Upload Logo</h5>
+                        <input type="file" id="logo-input" class="form-control bg-dark text-light mb-2">
+                        <button class="btn btn-secondary btn-sm" onclick="uploadLogo()">Upload</button>
+                    </div>
+                    <div class="col-md-8">
+                        <h5>Contact Information</h5>
+                        <textarea id="contact-editor" class="code-editor" style="height: 300px;"></textarea>
+                        <button class="btn btn-info btn-sm mt-2" onclick="saveContact()">Update Contact JSON</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
-</div>
 
-<!-- Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-<script>
-    // --- GLOBAL VARS ---
-    let map, drawnItems;
-    let zones = [];
+    <script>
+        // --- MAP ---
+        let map, drawnItems;
 
-    // --- INIT ---
-    document.addEventListener('DOMContentLoaded', () => {
-        initMap();
-        loadZones();
-        loadApprovals();
-        loadConfig();
-    });
-
-    // --- MAP LOGIC ---
-    function initMap() {
-        map = L.map('map').setView([13.7563, 100.5018], 10); // Bangkok Center
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Sentinel Command | OpenStreetMap'
-        }).addTo(map);
-
-        drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
-
-        const drawControl = new L.Control.Draw({
-            edit: { featureGroup: drawnItems },
-            draw: {
-                polygon: false,
-                marker: false,
-                polyline: false,
-                circlemarker: false,
-                // Allow Circle and Rectangle
-                circle: true,
-                rectangle: true
-            }
-        });
-        map.addControl(drawControl);
-
-        map.on(L.Draw.Event.CREATED, function (e) {
-            const layer = e.layer;
-            drawnItems.addLayer(layer);
-            // Logic to add to internal zones array? 
-            // Better: Just let user draw, then we parse layers on Save.
-        });
-    }
-
-    async function loadZones() {
-        const res = await fetch('/api/admin/zones');
-        const data = await res.json();
-        zones = data.zones || [];
-        
-        drawnItems.clearLayers();
-        const zoneList = document.getElementById('zone-list');
-        zoneList.innerHTML = '';
-
-        zones.forEach((z, idx) => {
-            let layer;
-            const popup = `<b>${z.zone_name}</b><br>${z.notes}`;
-            
-            // Add to Sidebar
-            zoneList.innerHTML += `<div class="card p-2 mb-1"><small><b>${z.zone_name}</b> (${z.shape_type})</small></div>`;
-
-            if (z.shape_type === 'RECTANGLE') {
-                const bounds = [[z.bound_nw_lat, z.bound_nw_lng], [z.bound_se_lat, z.bound_se_lng]];
-                layer = L.rectangle(bounds, {color: "#ff0000", weight: 1});
-            } else if (z.shape_type === 'CIRCLE') {
-                layer = L.circle([z.lat_center, z.lng_center], {
-                    radius: z.radius_km * 1000, 
-                    color: "#ff0000", weight: 1
-                });
-            }
-            
-            if(layer) {
-                layer.bindPopup(popup);
-                drawnItems.addLayer(layer);
-                // attach data for save
-                layer.sentinelData = z; 
-            }
-        });
-    }
-
-    async function saveZones() {
-        const newZones = [];
-        drawnItems.eachLayer(layer => {
-            let z = {
-                zone_name: "New Zone",
-                risk_level: "HIGH",
-                notes: "Created via Admin Portal"
-            };
-            
-            // Preserve existing metadata if edited
-            if (layer.sentinelData) {
-                z = {...layer.sentinelData};
-            }
-
-            if (layer instanceof L.Rectangle) {
-                z.shape_type = 'RECTANGLE';
-                const bounds = layer.getBounds();
-                z.bound_nw_lat = bounds.getNorthWest().lat.toFixed(4);
-                z.bound_nw_lng = bounds.getNorthWest().lng.toFixed(4);
-                z.bound_se_lat = bounds.getSouthEast().lat.toFixed(4);
-                z.bound_se_lng = bounds.getSouthEast().lng.toFixed(4);
-                // Center for ref
-                const center = bounds.getCenter();
-                z.lat_center = center.lat.toFixed(4);
-                z.lng_center = center.lng.toFixed(4);
-                z.radius_km = 0;
-            } else if (layer instanceof L.Circle) {
-                z.shape_type = 'CIRCLE';
-                const latlng = layer.getLatLng();
-                z.lat_center = latlng.lat.toFixed(4);
-                z.lng_center = latlng.lng.toFixed(4);
-                z.radius_km = (layer.getRadius() / 1000).toFixed(2);
-            }
-            newZones.push(z);
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            loadZones();
+            // Load other tabs data on demand or init
+            loadApprovals();
+            loadAlerts();
+            loadPrompt();
+            loadOSINT();
+            loadConfigAndContact();
         });
 
-        const res = await fetch('/api/admin/zones/save', {
-            method: 'POST',
-            body: JSON.stringify({zones: newZones})
-        });
-        const ans = await res.json();
-        alert(ans.message || ans.error);
-    }
-
-    // --- APPROVAL LOGIC ---
-    async function loadApprovals() {
-        const res = await fetch('/api/admin/approvals');
-        const data = await res.json();
-        const tbody = document.getElementById('approval-table');
-        tbody.innerHTML = '';
-        
-        data.pending.forEach(doc => {
-            const en = doc.languages.en;
-            tbody.innerHTML += `
-                <tr>
-                    <td>${doc.zip_code}</td>
-                    <td>${en.location_name}</td>
-                    <td>DETECTION (Pending)</td>
-                    <td><small>${en.summary[0]}</small></td>
-                    <td>
-                        <button class="btn btn-sm btn-approve" onclick="decide('${doc.zip_code}', 'APPROVE')">Approve</button>
-                        <button class="btn btn-sm btn-reject" onclick="decide('${doc.zip_code}', 'REJECT')">Reject</button>
-                    </td>
-                </tr>
-            `;
-        });
-        if(data.pending.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No pending alerts.</td></tr>';
+        function initMap() {
+            map = L.map('map').setView([13.7563, 100.5018], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'Sentinel' }).addTo(map);
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            const drawControl = new L.Control.Draw({
+                edit: { featureGroup: drawnItems },
+                draw: { polygon: false, marker: false, polyline: false, circlemarker: false, circle: true, rectangle: true }
+            });
+            map.addControl(drawControl);
+            map.on(L.Draw.Event.CREATED, e => drawnItems.addLayer(e.layer));
         }
-    }
 
-    async function decide(zip, action) {
-        if(!confirm(`Confirm ${action} for ${zip}?`)) return;
-        
-        const res = await fetch('/api/admin/approvals/decide', {
-            method: 'POST',
-            body: JSON.stringify({zip_code: zip, action: action})
-        });
-        loadApprovals();
-    }
+        async function loadZones() {
+            const res = await fetch('/api/admin/zones');
+            const data = await res.json();
+            drawnItems.clearLayers();
+            const list = document.getElementById('zone-list');
+            list.innerHTML = '';
+            (data.zones || []).forEach(z => {
+                list.innerHTML += `<div class='border-bottom border-secondary mb-1 p-1'>${z.zone_name} <span class='badge bg-dark'>${z.shape_type}</span></div>`;
+                let layer;
+                if (z.shape_type === 'RECTANGLE') {
+                    layer = L.rectangle([[z.bound_nw_lat, z.bound_nw_lng], [z.bound_se_lat, z.bound_se_lng]], { color: 'red' });
+                } else if (z.shape_type === 'CIRCLE') {
+                    layer = L.circle([z.lat_center, z.lng_center], { radius: z.radius_km * 1000, color: 'red' });
+                }
+                if (layer) {
+                    layer.bindPopup(`<b>${z.zone_name}</b>`);
+                    layer.sentinelData = z;
+                    drawnItems.addLayer(layer);
+                }
+            });
+        }
 
-    // --- CONFIG LOGIC ---
-    async function loadConfig() {
-        const res = await fetch('/api/admin/config');
-        const data = await res.json();
-        document.getElementById('config-editor').value = data.content;
-    }
-    
-    async function saveConfig() {
-        const content = document.getElementById('config-editor').value;
-        await fetch('/api/admin/config/save', {
-             method: 'POST',
-             body: JSON.stringify({content: content})
-        });
-        alert("Configuration saved.");
-    }
+        async function saveZones() {
+            // Logic similar to previous step
+            const zones = [];
+            drawnItems.eachLayer(l => {
+                // simplified extraction logic
+                const z = l.sentinelData || { zone_name: "New Zone", risk_level: "HIGH" };
+                if (l instanceof L.Rectangle) {
+                    z.shape_type = 'RECTANGLE';
+                    z.bound_nw_lat = l.getBounds().getNorthWest().lat;
+                    z.bound_nw_lng = l.getBounds().getNorthWest().lng;
+                    z.bound_se_lat = l.getBounds().getSouthEast().lat;
+                    z.bound_se_lng = l.getBounds().getSouthEast().lng;
+                } else if (l instanceof L.Circle) {
+                    z.shape_type = 'CIRCLE';
+                    z.lat_center = l.getLatLng().lat;
+                    z.lng_center = l.getLatLng().lng;
+                    z.radius_km = l.getRadius() / 1000;
+                }
+                zones.push(z);
+            });
+            await fetch('/api/admin/zones/save', { method: 'POST', body: JSON.stringify({ zones }) });
+            alert('Zones Saved.');
+        }
 
-</script>
+        // --- INTEL ---
+        async function loadPrompt() {
+            const d = await (await fetch('/api/admin/prompt')).json();
+            document.getElementById('prompt-editor').value = d.content;
+        }
+        async function savePrompt() {
+            await fetch('/api/admin/prompt/save', { method: 'POST', body: JSON.stringify({ content: document.getElementById('prompt-editor').value }) });
+            alert('Prompt Updated.');
+        }
+        async function loadOSINT() {
+            const d = await (await fetch('/api/admin/osint')).json();
+            const t = document.getElementById('osint-table');
+            t.innerHTML = d.sources.map(s => `<tr><td>${s.Source}</td><td>${s.URL}</td><td>${s.Type}</td></tr>`).join('');
+        }
+        async function searchZips() {
+            const q = document.getElementById('zip-search').value;
+            const d = await (await fetch(`/api/admin/zips/search?q=${q}`)).json();
+            document.getElementById('zip-results').innerHTML = d.results.map(r => `<li class="list-group-item bg-dark text-light">${r.POSTAL_CODE} - ${r.DISTRICT_ENGLISH}</li>`).join('');
+        }
+
+        // --- OPS ---
+        async function loadApprovals() {
+            const d = await (await fetch('/api/admin/approvals')).json();
+            const t = document.getElementById('approvals-table');
+            if (!d.pending.length) { t.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No pending alerts.</td></tr>'; return; }
+            t.innerHTML = d.pending.map(doc => `
+            <tr>
+                <td>${doc.zip_code}</td>
+                <td>${doc.languages?.en?.location_name || 'Unknown'}</td>
+                <td><small>${doc.languages?.en?.summary?.[0]}</small></td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="decide('${doc.zip_code}', 'APPROVE')">Approve</button>
+                    <button class="btn btn-sm btn-danger" onclick="decide('${doc.zip_code}', 'REJECT')">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+        }
+        async function decide(zip, action) {
+            await fetch('/api/admin/approvals/decide', { method: 'POST', body: JSON.stringify({ zip_code: zip, action }) });
+            loadApprovals();
+        }
+        async function loadAlerts() {
+            const d = await (await fetch('/api/admin/alerts')).json();
+            document.getElementById('alerts-table').innerHTML = d.alerts.map(a => `<tr><td>${a.zip_code}</td><td>${a.languages.en.defcon_status}</td><td>${a.languages.en.last_updated}</td></tr>`).join('');
+        }
+
+        // --- CONFIG ---
+        async function loadConfigAndContact() {
+            const c = await (await fetch('/api/admin/contact')).json();
+            document.getElementById('contact-editor').value = JSON.stringify(c, null, 4);
+            const a = await (await fetch('/api/admin/config')).json();
+            document.getElementById('api-config-editor').value = a.content;
+        }
+        async function saveContact() {
+            await fetch('/api/admin/contact/save', { method: 'POST', body: document.getElementById('contact-editor').value });
+            alert('Contact Info Saved.');
+        }
+        async function saveApiConfig() {
+            await fetch('/api/admin/config/save', { method: 'POST', body: JSON.stringify({ content: document.getElementById('api-config-editor').value }) });
+            alert('API Config Saved.');
+        }
+        async function uploadLogo() {
+            const fd = new FormData();
+            fd.append('logo', document.getElementById('logo-input').files[0]);
+            await fetch('/api/admin/logo/upload', { method: 'POST', body: fd });
+            alert('Logo Uploaded.');
+        }
+
+    </script>
 </body>
+
 </html>
