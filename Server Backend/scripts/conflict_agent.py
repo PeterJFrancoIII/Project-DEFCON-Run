@@ -111,37 +111,21 @@ def generate_master_intel(zip_code, geo_info, news_text):
     if geo_info['distance_km'] > 0:
         dist_info = f"TARGET DISTANCE TO THREAT: {geo_info['distance_km']} km (Nearest: {geo_info['nearest_hotzone']})"
 
-    prompt = f"""
-    ACT AS A MILITARY INTELLIGENCE OFFICER.
-    TARGET: {geo_info['name']} (Zip: {zip_code})
-    {dist_info}
-    NEWS: {news_text}
-    
-    TASK: GENERATE SAFETY REPORT (IN ENGLISH).
-    
-    LOGIC:
-    - < 10km: DEFCON 1 (IMMEDIATE DANGER).
-    - 10-40km: DEFCON 2 (HIGH RISK).
-    - 40-100km: DEFCON 3/4 (CAUTION).
-    - > 100km: DEFCON 5 (SAFE).
-    
-    OUTPUT JSON ONLY:
-    {{
-        "defcon_status": (int 1-5),
-        "evacuation_point": {{ "name": "City", "lat": (float), "lon": (float), "reason": "Text" }},
-        "roads_to_avoid": ["Road A"], 
-        "emergency_avoid_locations": ["Zone B"],
-        "summary": ["Bullet 1", "Bullet 2", "Bullet 3", "Bullet 4", "Bullet 5"],
-        "metadata": {{ "threat_velocity": "Rising/Stable", "confidence_score": (int), "source_count": (int) }},
-        "predictive": {{
-            "defcon": (int),
-            "vector_heading": "Advancing/Static",
-            "forecast_trend": "Rising/Falling/Stable",
-            "forecast_summary": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5"],
-            "risk_probability": (int)
-        }}
-    }}
-    """
+    # Load External Prompt
+    prompt_path = os.path.join(BASE_DIR, 'Developer Inputs', 'analyst_system_prompt.txt')
+    try:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            template = f.read()
+            
+        prompt = template.format(
+            target_name=f"{geo_info['name']} (Zip: {zip_code})",
+            dist_info=dist_info,
+            news_text=news_text
+        )
+    except Exception as e:
+        print(f"[AGENT] Prompt Load Error: {e}")
+        # Fallback minimal prompt
+        prompt = f"ACT AS INTELLIGENCE OFFICER. TARGET: {zip_code}. NEWS: {news_text}. OUTPUT JSON."
     try:
         resp = MODEL.generate_content(prompt)
         text = resp.text.replace("```json", "").replace("```", "").strip()

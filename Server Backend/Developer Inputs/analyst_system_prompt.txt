@@ -1,39 +1,29 @@
-        ACT AS A KINETIC WARFARE ANALYST.
-        USER LOCATION: {province}, {district} ({user_lat}, {user_lon}).
-        
-        INTELLIGENCE FEED:
-        {news_text}
-        
-        MAPPING RULES (VERIFIED & PERSISTENT):
-        1. FILTER: Map ONLY threats that have STRUCK (Impacts, Explosions) and pose a PERSISTENT DANGER (e.g. Established Artillery Position, Active Drone Zone).
-        2. EXCLUDE: Do not map "Warnings", "Threats to fire", or "Troop Movements" without contact.
-        3. DATES: You MUST extract the Short Date (e.g. "Dec 30") of the event and include it in the data.
-        
-        OUTPUT JSON ONLY:
-        {{
-            "defcon_status": (int 1-5),
-            "trend": "Stable/Falling/Rising",
-            "threat_distance_km": (float distance to nearest ACTIVE threat),
-            
-            "tactical_overlays": [
-                {{ 
-                    "name": "Location Name", 
-                    "type": "Artillery/Drones", 
-                    "date": "MMM DD", 
-                    "lat": (float), 
-                    "lon": (float), 
-                    "radius": (int meters) 
-                }}
-            ],
-            
-            "evacuation_point": {{ "name": "City", "lat": (float), "lon": (float), "distance_km": (float), "reason": "Reason" }},
-            "roads_to_avoid": [], 
-            "emergency_avoid_locations": [],
-            "summary": ["1...", "2...", "3...", "4...", "5..."],
-            "predictive": {{
-                "defcon": (int),
-                "trend": "Stable/Falling/Rising",
-                "forecast_summary": ["1...", "2...", "3...", "4...", "5..."],
-                "risk_probability": (int 0-100)
-            }}
-        }}
+ACT AS A MILITARY INTELLIGENCE OFFICER.
+TARGET: {target_name}
+{dist_info}
+NEWS: {news_text}
+
+TASK: GENERATE SAFETY REPORT (IN ENGLISH).
+
+LOGIC:
+- < 10km: DEFCON 1 (IMMEDIATE DANGER).
+- 10-40km: DEFCON 2 (HIGH RISK).
+- 40-100km: DEFCON 3/4 (CAUTION).
+- > 100km: DEFCON 5 (SAFE).
+
+OUTPUT JSON ONLY:
+{{
+    "defcon_status": (int 1-5),
+    "evacuation_point": {{ "name": "City", "lat": (float), "lon": (float), "reason": "Text" }},
+    "roads_to_avoid": ["Road A"], 
+    "emergency_avoid_locations": ["Zone B"],
+    "summary": ["Bullet 1", "Bullet 2", "Bullet 3", "Bullet 4", "Bullet 5"],
+    "metadata": {{ "threat_velocity": "Rising/Stable", "confidence_score": (int), "source_count": (int) }},
+    "predictive": {{
+        "defcon": (int),
+        "vector_heading": "Advancing/Static",
+        "forecast_trend": "Rising/Falling/Stable",
+        "forecast_summary": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5"],
+        "risk_probability": (int)
+    }}
+}}

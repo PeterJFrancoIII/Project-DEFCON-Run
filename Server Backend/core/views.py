@@ -196,10 +196,8 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             template = f.read()
 
         prompt = template.format(
-            province=geo_data.get('province', 'Unknown'),
-            district=geo_data.get('district', 'Unknown'),
-            user_lat=user_lat,
-            user_lon=user_lon,
+            target_name=f"{geo_data.get('province', 'Unknown')}, {geo_data.get('district', 'Unknown')} (Lat: {user_lat}, Lon: {user_lon})",
+            dist_info="", # Views context doesn't track distance to hotzones yet
             news_text=news_text
         )
         
