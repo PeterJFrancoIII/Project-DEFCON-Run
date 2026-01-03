@@ -20,7 +20,7 @@ def get_db_handle():
         )
         # Test connection immediately
         client.admin.command('ping')
-        return client['sentinel_db']
+        return client['sentinel_intel']
 
     except Exception as e:
         print("\n[!] CRITICAL DATABASE ERROR")

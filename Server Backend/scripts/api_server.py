@@ -13,7 +13,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 MONGO_URI = "mongodb://localhost:27017/"
-DB_NAME = "BorderConflictDB"
+DB_NAME = "sentinel_intel"
 COLLECTION_NAME = "intel_history"
 
 # Polling Matrix (Deep Freeze)

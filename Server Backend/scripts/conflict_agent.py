@@ -19,9 +19,18 @@ from datetime import datetime
 
 # CONFIGURATION
 MONGO_URI = "mongodb://localhost:27017/"
-DB_NAME = "BorderConflictDB"
+DB_NAME = "sentinel_intel"
 COLLECTION_NAME = "intel_history"
-GEMINI_API_KEY = "AIzaSyDAqXQXtWm85QakcmQFqOIVQmDR3MjX4Y0"
+try:
+    from sys import path
+    import os
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    INPUTS_DIR = os.path.join(BASE_DIR, 'Developer Inputs')
+    path.append(INPUTS_DIR)
+    import api_config
+    GEMINI_API_KEY = api_config.GEMINI_API_KEY
+except:
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'YOUR_API_KEY_HERE')
 
 # Path relative to this script (Server Backend/scripts/conflict_agent.py)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -194,6 +203,13 @@ def run_mission(zip_code, country, target_lang):
             
             existing_doc["languages"]["en"] = master_intel
             existing_doc["timestamp"] = datetime.now().isoformat()
+            
+            # FIX: Inject GeoJSON for Django $near queries
+            existing_doc["location_geo"] = {
+                "type": "Point",
+                "coordinates": [geo_info['lon'], geo_info['lat']]
+            }
+            
             needs_save = True
 
     # 3. HANDLE TARGET LANGUAGE (ON DEMAND)
