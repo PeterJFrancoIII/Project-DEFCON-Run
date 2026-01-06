@@ -7,10 +7,11 @@
 ### 🎯 Objective
 You are being granted access to the **Sentinel Defense Technologies Information System (SDT-IS)** source code. Your primary objective is to get the full stack running locally, understand the architecture, and prepare to debug or create your own forks for feature development.
 
-The system consists of three main components:
+The system consists of four main components:
 1.  **Server Backend**: Django + Intelligence Agents (Python)
 2.  **Mobile Frontend**: Cross-platform App (Flutter)
 3.  **Investor/Public Website**: React Web App (Vite)
+4.  **Admin Console**: Mission Control & Data Management (Django Admin)
 
 ---
 
