@@ -1,0 +1,15 @@
+# Fastfile for iOS
+default_platform(:ios)
+
+platform :ios do
+  desc "Push a new release build to the App Store"
+  lane :release do
+    build_app(workspace: "Runner.xcworkspace", scheme: "Runner")
+    upload_to_app_store(
+      api_key_path: "./fastlane_api_key.json", # Path to API Key JSON - Follow instructions in README_FASTLANE
+      skip_metadata: true,
+      skip_screenshots: true,
+      force: true # Skip HTML report verification
+    )
+  end
+end

@@ -1,0 +1,48 @@
+# System
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.env.prod
+db.sqlite3
+mediafiles/
+staticfiles/
+mongodb_data/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+
+# Flutter
+.dart_tool/
+.idea/
+.vscode/
+android/.gradle
+android/captures/
+ios/.symlinks
+ios/Pods/
+build/
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Credentials
+service_account.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!jsconfig.json

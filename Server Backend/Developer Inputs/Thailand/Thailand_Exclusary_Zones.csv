@@ -1,0 +1,17 @@
+zone_name,risk_level,shape_type,lat_center,lng_center,radius_km,bound_nw_lat,bound_nw_lng,bound_se_lat,bound_se_lng,notes
+Chitralada Royal Villa,NUCLEAR,RECTANGLE,13.7665,100.5245,1.5,13.773607914503268,100.51528913449725,13.763103997789317,100.5262329432078,Queen Mother Residence. Use Kill Box to save Dusit District.
+The Grand Palace,NUCLEAR,RECTANGLE,13.7500,100.4910,1.0,13.752391184206035,100.48945445876691,13.747847469279337,100.49391763735335,Ceremonial Center. Use Kill Box to save Tourist Areas.
+Amphorn Sathan Hall,NUCLEAR,CIRCLE,13.769,100.513,1.2,,,King Rama X Primary Residence. Inside Dusit Complex.,,
+Sukhothai Palace,HIGH,CIRCLE,13.7815,100.5097,1,,,Princesses Residence.,,
+Sa Pathum Palace,HIGH,CIRCLE,13.7481,100.532,0.4,,,Princess Sirindhorn. TIGHT RADIUS (400m) to save Siam Paragon.,,
+Klai Kangwon Palace,HIGH,CIRCLE,12.588,99.955,2,,,Hua Hin Summer Residence.,,
+Chakri Bongkot Palace,HIGH,CIRCLE,14.095,100.468,2,,,Pathum Thani Residence.,,
+Bhubing Palace,MEDIUM,CIRCLE,18.8059,98.8977,2,,,Chiang Mai Winter Residence.,,
+Taksin Ratchaniwet Palace,MEDIUM,CIRCLE,6.425,101.833,2.5,,,Narathiwat Southern Residence.,,
+Phu Phan Palace,MEDIUM,CIRCLE,17.16,103.95,2.5,,,Sakon Nakhon Residence.,,
+Bang Pa-In Royal Palace,MEDIUM,CIRCLE,14.232,100.579,1.5,,,Ayutthaya Summer Palace.,,
+Sanam Chandra Palace,MEDIUM,CIRCLE,13.819,100.046,1.2,,,Nakhon Pathom Residence.,,
+Mrigadayavan Palace,MEDIUM,CIRCLE,12.704,99.963,1.5,,,Cha-am Seaside Palace.,,
+Doi Tung Royal Villa,MEDIUM,CIRCLE,20.289,99.81,2,,,Chiang Rai Royal Villa.,,
+Siriraj Hospital,LOW,CIRCLE,13.7596,100.4859,0.6,,,Royal Medical Wing.,,
+Vimanmek Mansion,MEDIUM,CIRCLE,13.7744,100.5124,1,,,Dusit Complex Museum.,,

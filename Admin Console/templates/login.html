@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel Admin Login</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-box {
+            background: #161b22;
+            padding: 2rem;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        h2 { text-align: center; margin-bottom: 1.5rem; color: #58a6ff; }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 1rem;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #fff;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #238636;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #2ea043; }
+        .error { color: #f85149; margin-bottom: 1rem; text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2>Sentinel Command</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="POST">
+            {% csrf_token %}
+            <input type="text" name="username" placeholder="Username" required autofocus>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>
