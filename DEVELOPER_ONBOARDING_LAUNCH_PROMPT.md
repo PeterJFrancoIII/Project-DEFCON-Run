@@ -69,10 +69,7 @@ Ensure your development environment has the following installed:
     ```bash
     python manage.py runserver 0.0.0.0:8000
     ```
-    *   **Admin Console**: `http://localhost:8000/admin_portal`
-    *   **Login**:
-        *   User: `PeterJFrancoIII`
-        *   Pass: `tawny9-kajxit-paFron*&%*&BJajbya78`
+    *   **API**: `http://localhost:8000`
 
 #### 2. Mobile Application (Android/iOS)
 1.  Navigate to the project directory:
@@ -99,10 +96,21 @@ Ensure your development environment has the following installed:
     ```
     *   Access at: `http://localhost:5173` (or `3000` if 5173 is taken).
 
+#### 4. 🛑 Admin Console (Mission Control)
+Once the Backend (Step 1) is passing:
+
+1.  **Open URL**: [http://localhost:8000/admin_portal](http://localhost:8000/admin_portal)
+2.  **Login Credentials**:
+    *   **Username**: `PeterJFrancoIII`
+    *   **Password**: `tawny9-kajxit-paFron*&%*&BJajbya78`
+3.  **2FA Setup**:
+    *   Scan the QR code with Google Authenticator (or Authy).
+    *   Input the 6-digit code.
+    *   *Note: If this page errors with a 500, check the "Mac Apple Silicon Fix" in Step 1.*
+
 ---
 
 ### 🔑 Key Configuration
 *   **API Keys**: Set `GEMINI_API_KEY` in environment variables or `Server Backend/Developer Inputs/api_config.py`.
-*   **Admin 2FA**: If the 2FA setup page crashes, it is almost certainly the `Pillow` library issue mentioned in Step 1.
 
 **Go forth and build.**
