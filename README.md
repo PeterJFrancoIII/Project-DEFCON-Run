@@ -12,7 +12,6 @@ cd "Server Backend"
 sh run_public.sh
 ```
 *   **Port**: `8000`
-*   **Admin Console**: `http://localhost:8000/admin_portal`
 
 ## 2. Mobile Application (Flutter)
 The mobile app runs on both Android and iOS from the same codebase.
@@ -32,7 +31,12 @@ flutter run
 *   *Select the iOS Simulator if prompted.*
 *   *Note: Requires `CocoaPods` installed (`sudo gem install cocoapods`).*
 
-## 3. Configuration
+## 3. Admin Console (Mission Control)
+- **URL**: `http://localhost:8000/admin_portal`
+- **Creds**: See [Launch Prompt](DEVELOPER_ONBOARDING_LAUNCH_PROMPT.md).
+
+
+## 4. Configuration
 - **AI Models**: Configured in `Server Backend/core/views.py`.
 - **API Keys**: Set `GEMINI_API_KEY` in environment or `api_config.py`.
 - **Database**: Uses local MongoDB (`sentinel_intel`).
