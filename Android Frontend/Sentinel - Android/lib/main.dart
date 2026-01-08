@@ -34,7 +34,8 @@ String get serverUrl {
 /// If not (timeout/error), uses Localhost (Emulator).
 Future<void> determineServerUrl() async {
   const String vpsUrl = "http://146.190.7.51";
-  const String localUrl = "http://10.0.2.2:8000"; // Correct for Android Emulator
+  const String localUrl =
+      "http://10.0.2.2:8000"; // Correct for Android Emulator
 
   try {
     debugPrint("[INIT] Checking LOCAL connectivity: $localUrl");
@@ -1016,12 +1017,7 @@ class _LandingPageState extends State<LandingPage> {
                         label: Text(Loc.tr("DONATE", vm.userLang),
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 10)),
-<<<<<<< HEAD
-                        onPressed: () => _launchURL(
-                            "https://www.paypal.com/donate?hosted_button_id=SKTF4DM7JLV26"),
-=======
                         onPressed: () => _launchURL(vm.donateUrl),
->>>>>>> cb4eab8 (Golden Master: Final Polish & Intelligence Logic Updates)
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.pink,
                             shape: RoundedRectangleBorder(
