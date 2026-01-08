@@ -11,11 +11,9 @@
 
 ### Mobile Config
 - **File**: `Android Frontend/Sentinel - Android/lib/main.dart`
-- **Action**: Ensure `serverUrl` points to the Android Emulator loopback:
-  ```dart
-  // TARGET: EMULATOR LOCALHOST
-  return "http://10.0.2.2:8000";
-  ```
+- **Action**: **No Action Required**.
+  - The app now automatically attempts to connect to the **VPS** first.
+  - If unreachable (e.g., local dev), it falls back to **Localhost (10.0.2.2)**.
 
 ## 2. Launch Sequence (Execute in Order)
 

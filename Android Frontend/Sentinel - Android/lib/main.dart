@@ -23,9 +23,35 @@ import 'package:intl/intl.dart';
 // CRITICAL FIX: Android Emulator requires 10.0.2.2 to see the Host Mac.
 // Web requires localhost.
 
+// Initialized to fail-safe localhost, but updated by determineServerUrl
+String _activeServerUrl = "http://10.0.2.2:8000";
+
 String get serverUrl {
-  // Android Emulator Localhost
-  return "http://10.0.2.2:8000";
+  return _activeServerUrl;
+}
+
+/// Checks VPS connectivity. If reachable, sets serverUrl to VPS.
+/// If not (timeout/error), uses Localhost (Emulator).
+Future<void> determineServerUrl() async {
+  const String vpsUrl = "http://146.190.7.51";
+  const String localhostUrl = "http://10.0.2.2:8000";
+
+  try {
+    debugPrint("[INIT] Checking connectivity to VPS: $vpsUrl");
+    final response =
+        await http.get(Uri.parse(vpsUrl)).timeout(const Duration(seconds: 3));
+
+    if (response.statusCode == 200 || response.statusCode == 404) {
+      // 404 is acceptable, means server receives request but maybe path is wrong
+      debugPrint("[INIT] VPS Reached. Using PRODUCTION URL.");
+      _activeServerUrl = vpsUrl;
+      return;
+    }
+  } catch (e) {
+    debugPrint("[INIT] VPS Unreachable ($e). Fallback to LOCALHOST.");
+  }
+
+  _activeServerUrl = localhostUrl; // Fallback
 }
 
 const String _supportEmail = "PeterJFrancoIII1@gmail.com";
@@ -469,7 +495,9 @@ class SentinelProvider with ChangeNotifier {
 }
 
 // --- 4. MAIN ---
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await determineServerUrl();
   runApp(MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => SentinelProvider())],
       child: const MyApp()));

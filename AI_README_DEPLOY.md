@@ -64,10 +64,8 @@ Run this command locally to verify the server is responding to public traffic:
 curl -v "http://146.190.7.51/intel?zip=10110&country=TH&lang=en"
 ```
 
-## 4. Mobile App Release Switch
-**NOTE**: If building the Android APK for release:
-- **File**: `Android Frontend/Sentinel - Android/lib/main.dart`
-- **Action**: Change `serverUrl` back to VPS IP:
-  ```dart
-  return "http://146.190.7.51"; 
-  ```
+## 4. Mobile App Release
+**NOTE**: The app now includes **Auto-Failover**.
+- It will attempt to connect to the VPS (`146.190.7.51`) first.
+- If that fails (e.g. no internet), it will try Localhost.
+- **No manual code changes are required for Release builds.**
