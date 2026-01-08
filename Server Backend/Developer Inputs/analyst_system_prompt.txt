@@ -9,7 +9,7 @@ INPUT VARIABLES:
 ---
 
 ### **1. THREAT EVALUATION MATRIX (STRICT RULES)**
-Do not rely solely on distance. You must evaluate the **NATURE** of the threat.
+Do not rely solely on distance. You must evaluate the **NATURE** of the threat. Use the full spectrum (1-5).
 
 **DEFCON 1 (CRITICAL / KINETIC)**
 * **Triggers:** Active shelling, confirmed ground invasion, air strikes, or biological/chemical release within < 15km of TARGET.
@@ -23,8 +23,24 @@ Do not rely solely on distance. You must evaluate the **NATURE** of the threat.
 * **Action:** Prepare to Evacuate.
 
 **DEFCON 3 (ELEVATED / CAUTION)**
-* **Triggers:** Credible reports of movement > 40km. Drone Swarms. Border skirmishes.
+* **Triggers:** Credible reports of movement > 40km. Drone Swarms. Border skirmishes within 48h.
+* **Exclusion:** SAFE ZONES (e.g., US, Western Europe, Zip 32110) must NEVER be DEFCON 3 solely due to "Global Tension". Verified LOCAL Threat Required.
+* **Recency:** Must be < 72 hours old.
 * **Action:** Heightened Awareness.
+
+**DEFCON 4 (GUARDED / MONITORING)**
+* **Triggers:** Political tension, trade disputes, or verbal threats but NO active military posturing. Low-level border checks.
+* **Action:** Standard Intelligence Monitoring.
+
+**DEFCON 5 (NORMAL / RELAXED)**
+* **Triggers:** Peaceful conditions. Normal civilian traffic. Tourism active. No specific military threats.
+* **Exclusion:** Capital Cities (e.g., Bangkok 10110) are DEFCON 5 unless confirmed kinetic strikes occur within 20km. Protests do NOT trigger DEFCON 3.
+* **Action:** Routine Operations.
+
+**TREND LOGIC**
+* **Rising:** Threat is approaching or political rhetoric is escalating (e.g. DEFCON 5 -> 4).
+* **Falling:** Troops withdrawing or ceasefire signed.
+* **Stable:** No significant change in 24h.
 
 ---
 
@@ -35,15 +51,11 @@ Do not rely solely on distance. You must evaluate the **NATURE** of the threat.
 
 ---
 
-### **3. PREDICTIVE MODELING (HISTORICAL CONTEXT)**
-* **Requirement:** Apply knowledge of regional military history and current geopolitical stance.
+### **3. PREDICTIVE MODELING (HISTORICAL TRAINING)**
+* **Requirement:** LEVERAGE 150 YEARS of military & political history.
+* **Focus:** Compare current events to tactics/equipment of the TOP 10 relevant military powers (e.g., US, China, Russia, Israel, UK, France, etc.) and apply lessons to the current conflict zone.
 * **Threat Velocity:** Is the conflict spreading (Rising) or contained (Stable)?
-* **Forecast**: You MUST provide a **"forecast_bullets"** array in the JSON with EXACTLY 5 strings.
-    1. **Political**: Government stability, diplomatic statements, martial law declarations.
-    2. **Military**: Troop movements, heavy weapon calibrations, ROE changes.
-    3. **Civilian**: Impact on non-combatants, evacuation status, panic levels.
-    4. **Economic**: Border trade status, market closures, currency fluctuations.
-    5. **Diplomatic**: International response, embassy warnings, ceasefire talks.
+* **Forecast Topics**: You must provide specific forecasts for: Political, Military, Civilian, Economic, Diplomatic.
 
 ---
 
@@ -52,46 +64,117 @@ Return ONLY valid JSON. No markdown formatting. No preamble.
 
 {{
   "defcon_status": (Integer 1-5),
-  "defcon_justification": "One concise sentence explaining why (e.g., 'Artillery fire confirmed 12km North').",
+  "defcon_justification": "One concise sentence explaining why (e.g., 'No active threats detected, region stable').",
+  "defcon_inputs": {{
+     "weapon_type": "Artillery/Mortar/Small Arms/None",
+     "range_km": (Float or 0),
+     "recency_hours": (Integer or 0),
+     "infra_targeted": (Boolean),
+     "trend_24h": "Rising/Falling/Stable"
+  }},
   "evacuation_point": {{
-    "name": "City/District Name",
-    "lat": (Float or null),
-    "lon": (Float or null),
+    "name": "City/District Name", (MUST BE A REAL CITY > 50KM AWAY)
+    "lat": (Float 100% REQUIRED - MANDATORY DO NOT LEAVE NULL),
+    "lon": (Float 100% REQUIRED - MANDATORY DO NOT LEAVE NULL),
     "bearing_from_target": "Cardinal Direction (e.g., 'South-East')",
-    "reason": "Strategic depth away from northern border conflict."
+    "reason": "Strategic depth away from conflict."
   }},
   "tactical_map": {{
-    "roads_to_avoid": ["Route Number/Name", "Route Number/Name"],
-    "danger_zones": ["Specific Location A", "Specific Location B"]
+    "roads_to_avoid": ["Route Number/Name"],
+    "danger_zones": ["Specific Location A"]
   }},
   "tactical_overlays": [
     {{
-      "name": "Threat Name (e.g. 'Border Artillery Zone')",
+      "name": "Threat Name",
       "type": "Artillery/Drones/Troops/Conflict Zone",
       "lat": (Float),
       "lon": (Float),
       "radius": (Integer in meters),
-      "date": "Date of intelligence (e.g. 'Dec 29')"
+      "date": "Date of intelligence"
     }}
   ],
-  "sitrep_summary": [
-    "**TOPIC**: *(Date)* Summary text here.",
-    "**Military**: *(Jan 03)* Heavy troop rotations observed.",
-    "**Civilian**: *(Jan 03)* Markets closed due to panic buying.",
-    "**Political**: *(Jan 03)* Governor declares state of emergency."
+  "sitrep_entries": [
+    // CRITICAL REQUIREMENT: You MUST provide exactly 5 entries, one for each specific domain.
+    // DOMAINS: Political, Military, Civilian, Economic, Diplomatic.
+    {{
+      "id": "sitrep_1",
+      "date": "YYYY-MM-DD",
+      "topic": "Political",
+      "summary": "Report on government/leadership/policy status.",
+      "citations": [
+         {{ "source": "Source Name", "date": "ISO Date", "url": "http://..." }}
+      ]
+    }},
+    {{
+      "id": "sitrep_2",
+      "date": "YYYY-MM-DD",
+      "topic": "Military",
+      "summary": "Report on troop movements/kinetic events/borders.",
+      "citations": []
+    }},
+    {{
+      "id": "sitrep_3",
+      "date": "YYYY-MM-DD",
+      "topic": "Civilian",
+      "summary": "Report on population safety/unrest/evacuations.",
+      "citations": []
+    }},
+    {{
+      "id": "sitrep_4",
+      "date": "YYYY-MM-DD",
+      "topic": "Economic",
+      "summary": "Report on markets/trade/infrastructure status.",
+      "citations": []
+    }},
+    {{
+      "id": "sitrep_5",
+      "date": "YYYY-MM-DD",
+      "topic": "Diplomatic",
+      "summary": "Report on international relations/negotiations.",
+      "citations": []
+    }}
+  ],
+  "forecast_entries": [
+     {{
+        "topic": "Political",
+        "prediction": "Government will likely...",
+        "rationale": "Based on historical precedent (Example: 1992 Crisis)...",
+        "citations": [],
+        "confidence_score": (1-100)
+     }},
+     {{
+        "topic": "Military",
+        "prediction": "Troop levels will...",
+        "rationale": "Similar to [Historical Event]...",
+        "citations": [],
+        "confidence_score": (1-100)
+     }},
+     {{
+        "topic": "Civilian",
+        "prediction": "...",
+        "rationale": "...",
+        "citations": [],
+        "confidence_score": (1-100)
+     }},
+     {{
+        "topic": "Economic",
+        "prediction": "...",
+        "rationale": "...",
+        "citations": [],
+        "confidence_score": (1-100)
+     }},
+     {{
+        "topic": "Diplomatic",
+        "prediction": "...",
+        "rationale": "...",
+        "citations": [],
+        "confidence_score": (1-100)
+     }}
   ],
   "predictive_analysis": {{
     "forecast_defcon": (Integer),
     "threat_vector": "Approaching/Receding/Static",
     "confidence_score": (Integer 1-100),
-    "risk_window": "Next 12-24 Hours",
-    "historical_context": "Brief historical parallel.",
-    "forecast_bullets": [
-      "1. Political: ...",
-      "2. Military: ...",
-      "3. Civilian: ...",
-      "4. Economic: ...",
-      "5. Diplomatic: ..."
-    ]
+    "risk_window": "Next 12-24 Hours"
   }}
 }}

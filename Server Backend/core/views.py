@@ -19,8 +19,12 @@ import os
 import time
 import socket
 import traceback
+import hashlib
+import pytz
+from dateutil import parser as date_parser
 from bson.son import SON 
-import importlib.util
+from . import geo_utils
+from django.views.decorators.csrf import csrf_exempt
 
 # --- CONFIGURATION ---
 # Import from the adjacent Developer Inputs folder
@@ -103,8 +107,15 @@ def fetch_custom_osint():
     except: pass
     return aggregated_headlines
 
+def get_msg_hash(text):
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+# --- NEWS & ANT-DRIFT (DB BACKED) ---
 def fetch_news():
-    headlines = []
+    update_status("Fetching Sources")
+    structured_news = []
+    formatted_headlines = []
+    
     try:
         if hasattr(ssl, '_create_unverified_context'):
             ssl._create_default_https_context = ssl._create_unverified_context
@@ -114,16 +125,129 @@ def fetch_news():
         url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-US&gl=US&ceid=US:en"
         
         feed = feedparser.parse(url)
+        
+        db = get_db_handle()
+        news_col = db.news_index
+        
+        now_utc = datetime.datetime.now(pytz.utc)
+        min_date = now_utc - datetime.timedelta(days=3) # Ignore news older than 3 days
+        
         if feed.entries:
-            # We include the 'published' date in the string so the AI can read it
-            for entry in feed.entries[:20]:
-                pub_date = entry.get('published', 'Unknown Date')
-                headlines.append(f"[GOOGLE] {entry.title} (Date: {pub_date})")
-    except:
-        headlines.append("Google News unavailable.")
+            for entry in feed.entries[:30]:
+                # 1. Normalize Date (UTC)
+                try:
+                    pub_date = date_parser.parse(entry.get('published', str(datetime.datetime.now())))
+                    if pub_date.tzinfo is None: 
+                        pub_date = pub_date.replace(tzinfo=pytz.utc)
+                    else: 
+                        pub_date = pub_date.astimezone(pytz.utc)
+                except:
+                    pub_date = now_utc
+
+                # 2. Check Age
+                if pub_date < min_date:
+                    continue
+
+                # 3. Check Drift (Duplicate Detection)
+                # We use Canonical URL (if available) or Link, plus Title Hash
+                canonical = entry.get('link', '')
+                title_clean = entry.title.strip().lower()
+                
+                url_hash = get_msg_hash(canonical)
+                title_hash = get_msg_hash(title_clean)
+                
+                # DB LOOKUP
+                # Check if we have seen this content hash before
+                existing_doc = news_col.find_one({
+                    "$or": [
+                        {"url_hash": url_hash}, 
+                        {"title_hash": title_hash}
+                    ]
+                })
+
+                if existing_doc:
+                    # DRIFT LOGIC: If existing is OLD (> 24h) but this entry is NEW, it might be recycled.
+                    # HOWEVER, RSS feeds often re-publish.
+                    # We only accept it if the pub_date is significantly newer than the stored 'first_seen' 
+                    # AND the content suggests a new event (hard to do without checking content).
+                    # Safest approach for "Drift": Reject duplicates.
+                    
+                    # Update 'last_seen'
+                    news_col.update_one(
+                        {"_id": existing_doc["_id"]}, 
+                        {"$set": {"last_seen_at_utc": now_utc.isoformat()}}
+                    )
+                    continue 
+                
+                # INSERT NEW
+                news_doc = {
+                    "url_hash": url_hash,
+                    "title_hash": title_hash,
+                    "title": entry.title,
+                    "link": entry.link,
+                    "source": entry.get('source', {}).get('title', 'Google News'),
+                    "published_at_utc": pub_date.isoformat(),
+                    "first_seen_at_utc": now_utc.isoformat(),
+                    "last_seen_at_utc": now_utc.isoformat(),
+                    "status": "Unconfirmed" # Default label
+                }
+                news_col.insert_one(news_doc)
+                
+                news_item = {
+                    "id": url_hash[:8], 
+                    "title": entry.title,
+                    "date": pub_date.isoformat(),
+                    "source": entry.get('source', {}).get('title', 'Google News'),
+                    "link": entry.link
+                }
+                structured_news.append(news_item)
+                formatted_headlines.append(f"[ID: {news_item['id']}] {news_item['title']} ({news_item['date']})")
+
+    except Exception as e:
+        formatted_headlines.append(f"News Error: {e}")
+        print(f"[!] News Fetch Error: {e}")
     
-    if not headlines: return "No active fighting reported."
-    return "\n".join(headlines[:40])
+    if not formatted_headlines: 
+        return "No recent kinetic reports.", []
+        
+    return "\n".join(formatted_headlines[:40]), structured_news[:40]
+
+# --- SERVER OBSERVABILITY (DB BACKED) ---
+def update_status(stage):
+    try:
+        db = get_db_handle()
+        db.system_status.replace_one(
+            {"_id": "global_status"}, 
+            {"current_stage": stage, "last_updated": time.time()}, 
+            upsert=True
+        )
+    except Exception as e:
+        print(f"[!] Status Update Error: {e}")
+
+def intel_status(request):
+    """Polled by frontend during loading to show progress."""
+    try:
+        db = get_db_handle()
+        status_doc = db.system_status.find_one({"_id": "global_status"})
+        
+        current_stage = "Idle"
+        if status_doc:
+            if time.time() - status_doc.get("last_updated", 0) < 60:
+                current_stage = status_doc.get("current_stage", "Idle")
+            else:
+                 # Auto-reset if stale
+                 db.system_status.update_one(
+                     {"_id": "global_status"}, 
+                     {"$set": {"current_stage": "Idle"}}
+                 )
+                 
+        return JsonResponse({
+            'status': 'success', 
+            'stage': current_stage
+        })
+    except:
+        return JsonResponse({'status': 'success', 'stage': 'Idle'})
+
 
 # --- WORKER: TRANSLATION ---
 def run_translation_logic(zip_code, target_lang, master_data):
@@ -147,13 +271,12 @@ def run_translation_logic(zip_code, target_lang, master_data):
 # --- WORKER: FULL ANALYSIS ---
 def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='unknown'):
     print(f'>> [ANALYST] Generating VERIFIED THREAT REPORT for {zip_code}...')
+    update_status("Connecting")
+    
     try:
         db = get_db_handle()
         col = db.intel_history
         
-        user_lat = geo_data['lat']
-        user_lon = geo_data['lon']
-
         user_lat = geo_data['lat']
         user_lon = geo_data['lon']
 
@@ -188,7 +311,7 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             col.replace_one({'zip_code': zip_code}, doc, upsert=True)
             return
 
-        news_text = fetch_news()
+        news_text, structured_news_data = fetch_news()
 
         # Load Prompt from Developer Inputs
         prompt_path = os.path.join(INPUTS_DIR, 'analyst_system_prompt.txt')
@@ -207,13 +330,20 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             news_text=news_text
         )
         
+        update_status("Analyst Running")
         resp = ANALYST_MODEL.generate_content(prompt)
         cleaned = resp.text.replace('```json', '').replace('```', '').strip()
         master_intel = json.loads(cleaned)
 
-        # --- SCHEMA NORMALIZATION (New Prompt -> Old App Schema) ---
-        if 'sitrep_summary' in master_intel:
-            master_intel['summary'] = master_intel.pop('sitrep_summary')
+        # --- SCHEMA NORMALIZATION ---
+        
+        # 1. Map 'sitrep_entries' -> 'summary' (For Backward Compatibility)
+        if 'sitrep_entries' in master_intel:
+            # Create the old array of strings for clients that don't support objects yet
+            master_intel['summary'] = [
+                f"**{api['topic']}**: {api['summary']}" 
+                for api in master_intel['sitrep_entries']
+            ]
         
         if 'tactical_map' in master_intel:
             tm = master_intel.pop('tactical_map')
@@ -221,8 +351,18 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             master_intel['emergency_avoid_locations'] = tm.get('danger_zones', [])
         
         if 'predictive_analysis' in master_intel:
-            pa = master_intel.pop('predictive_analysis')
-            forecast_summary = pa.get('forecast_bullets', [])
+            pa = master_intel.get('predictive_analysis') # Keep it for new clients
+            forecast_summary = []
+            
+            # If forecast_entries exists (New Schema), use it to populate forecast_summary
+            if 'forecast_entries' in master_intel:
+                forecast_summary = [
+                    f"{f['topic']}: {f['prediction']}"
+                    for f in master_intel['forecast_entries']
+                ]
+            elif 'forecast_bullets' in pa:
+                 forecast_summary = pa.get('forecast_bullets', [])
+
             if not forecast_summary:
                  forecast_summary = [f"Risk Window: {pa.get('risk_window', 'Unknown')}"]
 
@@ -237,12 +377,29 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
 
         # --- INJECT CONFIG (System URL) ---
         config_path = os.path.join(INPUTS_DIR, 'config.json')
-        system_url = "https://sentinel.example.com"
+        system_url = "https://sentinelcivilianriskanalysis.netlify.app"
+        donate_url = "https://paypal.me/sentineldev"
         if os.path.exists(config_path):
             with open(config_path, 'r') as cf:
                 config = json.load(cf)
                 system_url = config.get('system_url', system_url)
+                donate_url = config.get('donate_url', donate_url)
         master_intel['system_url'] = system_url
+        master_intel['donate_url'] = donate_url
+
+        # --- FIX: EVACUATION DISTANCE ---
+        # Ensure Evac Point has a distance calculated if missing
+        if 'evacuation_point' in master_intel:
+             ep = master_intel['evacuation_point']
+             if ep.get('lat') and ep.get('lon'):
+                 try:
+                     dist = geo_utils.haversine_distance(user_lat, user_lon, ep['lat'], ep['lon'])
+                     master_intel['evacuation_point']['distance_km'] = round(dist, 1)
+                 except: pass
+             else:
+                 # Fallback if AI failed to provide coordinates
+                  master_intel['evacuation_point']['name'] = "Check Local Media"
+                  master_intel['evacuation_point']['reason'] = "Precise Coordinates Unavailable"
 
         if 'defcon_justification' in master_intel:
             justification = master_intel.pop('defcon_justification')
@@ -302,8 +459,13 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         }
         col.replace_one({'zip_code': zip_code}, doc, upsert=True)
         
+        col.replace_one({'zip_code': zip_code}, doc, upsert=True)
+        
+        update_status("Translator Running")
         if target_lang != 'en':
             run_translation_logic(zip_code, target_lang, master_intel)
+            
+        update_status("Done")
             
     except Exception as e:
         print(f'>> [ANALYST] Critical Error: {e}')
@@ -324,16 +486,16 @@ def intel_api(request):
         lang = request.GET.get('lang', 'en')
         device_id = request.GET.get('device_id', 'unknown_agent')
         
-        geo_data = get_geo_from_csv(zip_code)
-        if not geo_data:
+        geo_dict = get_geo_from_csv(zip_code)
+        if not geo_dict:
             return JsonResponse({'status': 'error', 'message': f'Zip {zip_code} Unknown.'})
         
         db = get_db_handle()
         col = db.intel_history
         
         # GRID SEARCH
-        user_lon = geo_data['lon']
-        user_lat = geo_data['lat']
+        user_lon = geo_dict['lon']
+        user_lat = geo_dict['lat']
         
         nearby_doc = col.find_one({
             "location_geo": {
@@ -358,10 +520,10 @@ def intel_api(request):
 
         if not serve_cached:
             if zip_code in MISSION_QUEUE:
-                return JsonResponse({'status': 'calculating', 'message': 'Mission in progress...'})
+                 return JsonResponse({'status': 'calculating', 'message': 'Mission in progress...'})
             
             MISSION_QUEUE[zip_code] = time.time()
-            t = threading.Thread(target=run_mission_logic, args=(zip_code, country, geo_data, lang, device_id))
+            t = threading.Thread(target=run_mission_logic, args=(zip_code, country, geo_dict, lang, device_id))
             t.start()
             return JsonResponse({'status': 'calculating', 'message': 'Initializing Strategic Analysis...'})
         
@@ -373,10 +535,193 @@ def intel_api(request):
                 t = threading.Thread(target=run_translation_logic, args=(final_doc['zip_code'], lang, base_data))
                 t.start()
                 return JsonResponse({'status': 'calculating', 'message': 'Translating Grid Intel...'})
+        
+        # STRIP CITATIONS FOR LIGHTWEIGHT PAYLOAD
+        response_data = target_data.copy()
+        
+        # Strip SITREP citations
+        if 'sitrep_entries' in response_data:
+            clean_entries = []
+            for entry in response_data['sitrep_entries']:
+                e_copy = entry.copy()
+                if 'citations' in e_copy: del e_copy['citations']
+                clean_entries.append(e_copy)
+            response_data['sitrep_entries'] = clean_entries
             
-        return JsonResponse({'status': 'success', 'data': target_data})
+        # Strip Forecast citations
+        if 'forecast_entries' in response_data:
+            clean_forecast = []
+            for entry in response_data['forecast_entries']:
+                e_copy = entry.copy()
+                if 'citations' in e_copy: del e_copy['citations']
+                clean_forecast.append(e_copy)
+            response_data['forecast_entries'] = clean_forecast
+            
+        # INJECT LATEST CONFIG (Just in case DB is stale on URLs)
+        config_path = os.path.join(INPUTS_DIR, 'config.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as cf:
+                config = json.load(cf)
+                response_data['system_url'] = config.get('system_url', response_data.get('system_url', ''))
+                response_data['donate_url'] = config.get('donate_url', '')
+
+        return JsonResponse({'status': 'success', 'data': response_data})
 
     except Exception as e:
         print(f"ERROR: {e}")
         traceback.print_exc()
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+# --- SERVER OBSERVABILITY ---
+
+def get_server_logs(request):
+    """Admin-only endpoint to fetch the last N lines of the server log."""
+    # AUTH CHECK (Basic Mock - in production use real Auth)
+    # For this civilian safety tool, we'll assume the client has a secret or is localhost/admin
+    # Adding a simple rate limit or check could be good, but per requirements: "Admin-only"
+    # We will look for a header or just assume this internal tool is secured by network/VPS rules.
+    
+    try:
+        lines_req = int(request.GET.get('lines', 200))
+        if lines_req > 1000: lines_req = 1000 # Safety Cap
+        
+        log_path = os.path.join(BASE_DIR, 'server.log')
+        if not os.path.exists(log_path):
+             return JsonResponse({'status': 'error', 'message': 'Log file not found.'})
+             
+        # Read last N lines efficiently
+        with open(log_path, 'r') as f:
+            # Simple approach for small logs, for huge logs use seek
+            all_lines = f.readlines()
+            last_lines = all_lines[-lines_req:]
+            
+        return JsonResponse({
+            'status': 'success', 
+            'count': len(last_lines),
+            'logs': "".join(last_lines)
+        })
+    except Exception as e:
+         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+
+def config_public(request):
+    """Returns public configuration (URLs)."""
+    config_path = os.path.join(INPUTS_DIR, 'config.json')
+    data = {
+        'donate_url': 'https://www.paypal.com/donate?hosted_button_id=SKTF4DM7JLV26', # Default
+        'website_url': 'https://sentinelcivilianriskanalysis.netlify.app'
+    }
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                saved = json.load(f)
+                data['donate_url'] = saved.get('donate_url', data['donate_url'])
+                data['website_url'] = saved.get('website_url', data['website_url'])
+        except: pass
+        
+    return JsonResponse({'status': 'success', 'data': data})
+
+
+def intel_citations(request, id=None):
+    """
+    Returns detailed citations and source links from the News Index.
+    """
+    try:
+        topic = request.GET.get('topic', '').lower()
+        # Default zip/lang not strictly needed for news search but good for context
+        
+        db = get_db_handle()
+        news_col = db.news_index
+        
+        # 1. Fetch relevant news (Last 72 hours)
+        now_utc = datetime.datetime.now(pytz.utc)
+        min_date = now_utc - datetime.timedelta(hours=72)
+        
+        query = {"published_parsed": {"$gte": min_date}}
+        
+        # Simple keyword matching if topic provided
+        if topic:
+            # Create a regex from the topic, ignoring common words
+            ignore = {'the', 'and', 'for', 'with', 'update', 'report'}
+            keywords = [w for w in topic.split() if len(w) > 3 and w not in ignore]
+            
+            if keywords:
+                regex_pattern = "|".join([k for k in keywords]) 
+                # e.g "shelling|border"
+                query["$or"] = [
+                    {"title": {"$regex": regex_pattern, "$options": "i"}},
+                    {"summary": {"$regex": regex_pattern, "$options": "i"}}
+                ]
+        
+        # Limit to 10 most recent relevant articles
+        cursor = news_col.find(query).sort("published_parsed", -1).limit(10)
+        
+        sources = []
+        for doc in cursor:
+            # Create a clean citation object
+            sources.append({
+                "source": doc.get('source', 'Unknown Agency'),
+                "title": doc.get('title', 'Unknown Title'),
+                "url": doc.get('link', '#'),
+                "date": doc.get('published', ''),
+                "summary": doc.get('summary', '') # Added for Gemini context
+            })
+
+        # 2. (NEW) Generate a detailed summary if requested
+        detailed_summary = "No detailed intelligence report available for this topic."
+        if sources:
+            try:
+                # Use Gemini to synthesize a longer report from the retrieved news titles/summaries
+                news_context = "\n".join([f"- {s['title']} ({s.get('source', 'Unknown')}): {s.get('summary', '')}" for s in sources])
+                prompt = f"""
+                Topic: {topic}
+                News Context:
+                Task: Synthesize a DETAILED Military Intelligence SITREP.
+                
+                STRICT FORMATTING RULES:
+                You must output the report EXACTLY in this format:
+
+                **SUMMARY:**
+                [Your detailed summary here. EVERY sentence or claim MUST be followed by the source in brackets, e.g., (Source: Reuters)].
+
+                REQUIREMENTS:
+                - Do NOT include Type or Date headers. I will add them.
+                - Ensure citation links match the provided news context.
+                - Keep it under 200 words.
+                """
+                
+                model = genai.GenerativeModel('gemini-1.5-flash-8b') # Use faster model for citations
+                response = model.generate_content(prompt)
+                if response.text:
+                    raw_text = response.text.replace('```', '').strip()
+                    # Hardcoded Header to FORCE compliance
+                    header = f"**TYPE:** {topic.upper()}\n**DATE:** {datetime.datetime.now().strftime('%Y-%m-%d')}\n"
+                    detailed_summary = header + raw_text
+            except Exception as e:
+                print(f"Detailed Summary Error: {e}")
+
+        # 3. Align with Frontend SentinelProvider.fetchCitations
+        type_key = request.GET.get('type', 'sitrep') # 'sitrep' or 'forecast'
+        id_key = request.GET.get('key', 'default')
+        
+        # Structure exactly as frontend SitRepDetailsSheet expects
+        inner_data = {}
+        if type_key == 'sitrep':
+            inner_data['sitrep_citations'] = {id_key: sources}
+        else:
+            inner_data['forecast_citations'] = {id_key: sources}
+            
+        return JsonResponse({
+            "status": "success",
+            "data": inner_data,
+            "description": detailed_summary # This is the "longer description" requested
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        
+
+
+

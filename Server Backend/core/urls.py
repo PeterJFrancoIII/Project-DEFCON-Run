@@ -9,6 +9,12 @@ urlpatterns = [
     
     # The iPhone Data Feed
     path('intel', views.intel_api, name='intel_api'),
+    path('intel/status', views.intel_status, name='intel_status'),
+    path('intel/citations', views.intel_citations, name='intel_citations'),
+    path('intel/report/<str:id>/citations', views.intel_citations, name='intel_report_citations'), # Alias
+    
+    # Public Config
+    path('config/public', views.config_public, name='config_public'),
     
     # --- ADMIN PORTAL ---
     path('admin_portal', admin_views.admin_home, name='admin_home'),
@@ -37,6 +43,7 @@ urlpatterns = [
     path('api/admin/config/save', admin_views.api_save_config, name='api_save_config'),
 
     # --- ADMIN API: OPS ---
+    path('admin/ops/logs', views.get_server_logs, name='get_server_logs'),
     path('api/admin/approvals', admin_views.api_get_approvals, name='api_get_approvals'),
     path('api/admin/approvals/decide', admin_views.api_decide_approval, name='api_decide_approval'),
     path('api/admin/alerts', admin_views.api_get_active_alerts, name='api_get_active_alerts'),

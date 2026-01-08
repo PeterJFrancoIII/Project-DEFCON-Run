@@ -34,24 +34,32 @@ String get serverUrl {
 /// If not (timeout/error), uses Localhost (Emulator).
 Future<void> determineServerUrl() async {
   const String vpsUrl = "http://146.190.7.51";
-  const String localhostUrl = "http://10.0.2.2:8000";
+  const String localUrl = "http://10.0.2.2:8000"; // Correct for Android Emulator
 
   try {
-    debugPrint("[INIT] Checking connectivity to VPS: $vpsUrl");
-    final response =
-        await http.get(Uri.parse(vpsUrl)).timeout(const Duration(seconds: 3));
+    debugPrint("[INIT] Checking LOCAL connectivity: $localUrl");
+    final response = await http
+        .get(Uri.parse("$localUrl/intel/status"))
+        .timeout(const Duration(seconds: 2));
+    if (response.statusCode == 200) {
+      debugPrint("[INIT] Local Server detected. Using LOCALHOST.");
+      _activeServerUrl = localUrl;
+      return;
+    }
+  } catch (_) {}
 
+  try {
+    debugPrint("[INIT] Local offline. Checking VPS: $vpsUrl");
+    final response =
+        await http.get(Uri.parse(vpsUrl)).timeout(const Duration(seconds: 2));
     if (response.statusCode == 200 || response.statusCode == 404) {
-      // 404 is acceptable, means server receives request but maybe path is wrong
       debugPrint("[INIT] VPS Reached. Using PRODUCTION URL.");
       _activeServerUrl = vpsUrl;
       return;
     }
-  } catch (e) {
-    debugPrint("[INIT] VPS Unreachable ($e). Fallback to LOCALHOST.");
-  }
+  } catch (_) {}
 
-  _activeServerUrl = localhostUrl; // Fallback
+  _activeServerUrl = localUrl; // Final Fallback
 }
 
 const String _supportEmail = "PeterJFrancoIII1@gmail.com";
@@ -245,6 +253,52 @@ class SourceMetadata {
       url: json['url'] ?? "");
 }
 
+class Citation {
+  final String source;
+  final String date;
+  final String url;
+  const Citation({required this.source, required this.date, required this.url});
+  factory Citation.fromJson(Map<String, dynamic> json) => Citation(
+      source: json['source'] ?? "Unknown",
+      date: json['date'] ?? "",
+      url: json['url'] ?? "");
+}
+
+class CitationResponse {
+  final List<Citation> citations;
+  final String description;
+  const CitationResponse({required this.citations, required this.description});
+}
+
+class SitRepEntry {
+  final String id;
+  final String topic;
+  final String summary;
+  final String date;
+  const SitRepEntry(
+      {required this.id,
+      required this.topic,
+      required this.summary,
+      required this.date});
+  factory SitRepEntry.fromJson(Map<String, dynamic> json) => SitRepEntry(
+      id: json['id'] ?? "",
+      topic: json['topic'] ?? "Update",
+      summary: json['summary'] ?? "",
+      date: json['date'] ?? "");
+}
+
+class ForecastEntry {
+  final String topic;
+  final String prediction;
+  final String rationale;
+  const ForecastEntry(
+      {required this.topic, required this.prediction, required this.rationale});
+  factory ForecastEntry.fromJson(Map<String, dynamic> json) => ForecastEntry(
+      topic: json['topic'] ?? "",
+      prediction: json['prediction'] ?? "",
+      rationale: json['rationale'] ?? "");
+}
+
 class IntelDetails {
   final int defconStatus;
   final String? trend;
@@ -264,6 +318,9 @@ class IntelDetails {
   final String? analystModel;
   final String? translatorModel;
   final String? systemUrl;
+  final String? donateUrl;
+  final List<SitRepEntry> sitrepEntries;
+  final List<ForecastEntry> forecastEntries;
 
   const IntelDetails(
       {required this.defconStatus,
@@ -283,7 +340,10 @@ class IntelDetails {
       this.isCertified = true,
       this.analystModel,
       this.translatorModel,
-      this.systemUrl});
+      this.systemUrl,
+      this.donateUrl,
+      this.sitrepEntries = const [],
+      this.forecastEntries = const []});
 
   factory IntelDetails.fromJson(Map<String, dynamic> json) {
     return IntelDetails(
@@ -314,7 +374,16 @@ class IntelDetails {
         isCertified: json['is_certified'] ?? true,
         analystModel: json['analyst_model'],
         translatorModel: json['translator_model'],
-        systemUrl: json['system_url']);
+        systemUrl: json['system_url'],
+        donateUrl: json['donate_url'],
+        sitrepEntries: (json['sitrep_entries'] as List?)
+                ?.map((e) => SitRepEntry.fromJson(e))
+                .toList() ??
+            [],
+        forecastEntries: (json['forecast_entries'] as List?)
+                ?.map((e) => ForecastEntry.fromJson(e))
+                .toList() ??
+            []);
   }
 }
 
@@ -404,6 +473,11 @@ class SentinelProvider with ChangeNotifier {
   String userLang = "en";
   bool isLocked = true;
   String sentinelID = "unknown";
+  String donateUrl =
+      "https://www.paypal.com/donate?hosted_button_id=SKTF4DM7JLV26";
+  String websiteUrl = "https://sentinelcivilianriskanalysis.netlify.app";
+  String loadingStage = "Initializing...";
+
   SentinelProvider() {
     _loadInitData();
   }
@@ -456,13 +530,63 @@ class SentinelProvider with ChangeNotifier {
     isLocked = false;
     connectionStatus = "ESTABLISHING UPLINK...";
     notifyListeners();
+    fetchConfig(); // Get dynamic URLs
     fetchLatestIntel();
+    pollServerStatus(); // Start polling status
   }
 
   void resetSystem() {
     isLocked = true;
     intel = null;
     notifyListeners();
+  }
+
+  Future<void> fetchConfig() async {
+    try {
+      final url = Uri.parse("$serverUrl/config/public");
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        donateUrl = data['donate_url'] ?? donateUrl;
+        websiteUrl = data['website_url'] ?? websiteUrl;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("Config Error: $e");
+    }
+  }
+
+  Future<void> pollServerStatus() async {
+    if (intel != null || isLocked) return;
+
+    try {
+      final url = Uri.parse("$serverUrl/intel/status");
+      final response = await http.get(url).timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        loadingStage = data['stage'] ?? "Processing...";
+        notifyListeners();
+      }
+    } catch (_) {}
+
+    if (intel == null && !isLocked) {
+      Future.delayed(const Duration(seconds: 2), pollServerStatus);
+    }
+  }
+
+  Future<String> fetchServerLogs() async {
+    try {
+      // Admin endpoint - secure in prod, open in local dev
+      final url = Uri.parse("$serverUrl/admin/ops/logs?lines=200");
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['logs'] ?? "No logs returned.";
+      }
+      return "Error: ${response.statusCode}";
+    } catch (e) {
+      return "Connection Error: $e";
+    }
   }
 
   Future<void> fetchLatestIntel() async {
@@ -491,6 +615,33 @@ class SentinelProvider with ChangeNotifier {
       connectionStatus = "Connection Error: Check Internet";
     }
     notifyListeners();
+  }
+
+  Future<CitationResponse> fetchCitations(String type, String key) async {
+    final url = Uri.parse(
+        "$serverUrl/intel/citations?zip=$userZip&lang=$userLang&type=$type&key=$key");
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        if (decoded['status'] == 'success') {
+          final data = decoded['data'];
+          final description = decoded['description'] ?? "";
+          List<dynamic> raw = [];
+          if (type == 'sitrep') {
+            raw = data['sitrep_citations']?[key] ?? [];
+          } else {
+            raw = data['forecast_citations']?[key] ?? [];
+          }
+          final quotes = raw.map((e) => Citation.fromJson(e)).toList();
+          return CitationResponse(citations: quotes, description: description);
+        }
+      }
+    } catch (e) {
+      debugPrint("Citation Error: $e");
+    }
+    return const CitationResponse(
+        citations: [], description: "Error fetching report.");
   }
 }
 
@@ -865,8 +1016,12 @@ class _LandingPageState extends State<LandingPage> {
                         label: Text(Loc.tr("DONATE", vm.userLang),
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 10)),
+<<<<<<< HEAD
                         onPressed: () => _launchURL(
                             "https://www.paypal.com/donate?hosted_button_id=SKTF4DM7JLV26"),
+=======
+                        onPressed: () => _launchURL(vm.donateUrl),
+>>>>>>> cb4eab8 (Golden Master: Final Polish & Intelligence Logic Updates)
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.pink,
                             shape: RoundedRectangleBorder(
@@ -897,23 +1052,74 @@ class _LandingPageState extends State<LandingPage> {
 
 class LoadingPage extends StatelessWidget {
   const LoadingPage({super.key});
+
+  void _showLogs(BuildContext context, SentinelProvider vm) async {
+    showDialog(
+        context: context,
+        builder: (ctx) => const Center(
+            child: CircularProgressIndicator(color: Colors.yellow)));
+    final logs = await vm.fetchServerLogs();
+    if (context.mounted) Navigator.pop(context);
+
+    if (context.mounted) {
+      showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+                  backgroundColor: Colors.black,
+                  title: const Text("SERVER OUTPUT",
+                      style: TextStyle(
+                          color: Colors.yellow, fontFamily: 'Courier')),
+                  content: SizedBox(
+                      width: double.maxFinite,
+                      height: 400,
+                      child: SingleChildScrollView(
+                          reverse: true,
+                          child: Text(logs,
+                              style: const TextStyle(
+                                  color: Colors.green,
+                                  fontFamily: 'Courier',
+                                  fontSize: 10)))),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("CLOSE"))
+                  ]));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = Provider.of<SentinelProvider>(context);
     return Scaffold(
-        body: Center(
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const CircularProgressIndicator(color: Colors.red),
-      const SizedBox(height: 20),
-      Text(vm.connectionStatus,
-          style: const TextStyle(color: Colors.yellow, fontFamily: 'Courier')),
-      const SizedBox(height: 40),
-      TextButton(
-          onPressed: () => vm.resetSystem(),
-          child: const Text("ABORT",
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))
-    ])));
+        body: Stack(children: [
+      Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const CircularProgressIndicator(color: Colors.red),
+        const SizedBox(height: 20),
+        Text(vm.connectionStatus,
+            style:
+                const TextStyle(color: Colors.yellow, fontFamily: 'Courier')),
+        if (vm.connectionStatus.contains("GATHERING") ||
+            vm.connectionStatus == "ESTABLISHING UPLINK...")
+          Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text("STATUS: ${vm.loadingStage}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 10))),
+        const SizedBox(height: 40),
+        TextButton(
+            onPressed: () => vm.resetSystem(),
+            child: const Text("ABORT",
+                style:
+                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))
+      ])),
+      Positioned(
+          top: 40,
+          right: 20,
+          child: IconButton(
+              icon: const Icon(Icons.terminal, color: Colors.grey),
+              tooltip: "Server Logs",
+              onPressed: () => _showLogs(context, vm)))
+    ]));
   }
 }
 
@@ -1100,6 +1306,82 @@ class SitRepView extends StatelessWidget {
     }
   }
 
+  void _showCitations(BuildContext context, SitRepEntry entry) async {
+    final vm = Provider.of<SentinelProvider>(context, listen: false);
+
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF1A1A1A),
+        builder: (ctx) => const SizedBox(
+            height: 150,
+            child: Center(
+                child: CircularProgressIndicator(color: Colors.yellow))));
+
+    final citations = await vm.fetchCitations('sitrep', entry.id);
+    if (context.mounted) Navigator.pop(context); // Close loading
+
+    if (context.mounted) {
+      showModalBottomSheet(
+          context: context,
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (ctx) => Container(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("SITREP DETAIL: ${entry.topic.toUpperCase()}",
+                          style: const TextStyle(
+                              color: Colors.yellow,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 15),
+                      Text(entry.summary,
+                          style: const TextStyle(
+                              color: Colors.white, height: 1.5)),
+                      const SizedBox(height: 15),
+                      const Text("SERVER-GENERATED INTEL REPORT",
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2)),
+                      const SizedBox(height: 10),
+                      Text(citations.description,
+                          style: const TextStyle(
+                              color: Colors.white, height: 1.5)),
+                      const SizedBox(height: 20),
+                      const Divider(color: Colors.grey),
+                      const SizedBox(height: 15),
+                      const Text("SOURCE CITATIONS",
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 15),
+                      if (citations.citations.isEmpty)
+                        const Text("No citations available.",
+                            style: TextStyle(color: Colors.grey)),
+                      ...citations.citations.map((c) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(c.source,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            subtitle: Text(c.date,
+                                style: const TextStyle(color: Colors.grey)),
+                            trailing: const Icon(Icons.open_in_new,
+                                color: Colors.blue, size: 18),
+                            onTap: () => launchUrl(Uri.parse(c.url)),
+                          ))
+                    ]),
+              )));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     String killBoxDist = "N/A";
@@ -1257,7 +1539,7 @@ class SitRepView extends StatelessWidget {
                             children: [
                               Flexible(
                                   child: Text(
-                                      "${Loc.tr("SAFE_ZONE_DIST", lang)}: ${data.evacuationPoint.distanceKm?.toInt()} km",
+                                      "${Loc.tr("SAFE_ZONE_DIST", lang)}: ${data.evacuationPoint.distanceKm != null ? "${data.evacuationPoint.distanceKm!.toInt()} km" : "Calculating..."}",
                                       style: const TextStyle(
                                           color: Colors.green, fontSize: 12),
                                       overflow: TextOverflow.ellipsis))
@@ -1320,7 +1602,64 @@ class SitRepView extends StatelessWidget {
                         .toList())),
             const SizedBox(height: 15),
           ],
-          if (data.summary.isNotEmpty)
+          if (data.sitrepEntries.isNotEmpty)
+            Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.yellow)),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Center(
+                          child: Text("INTELLIGENCE REPORT",
+                              style: TextStyle(
+                                  color: Colors.yellow,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14))),
+                      const SizedBox(height: 10),
+                      Divider(color: Colors.grey[800]),
+                      const SizedBox(height: 10),
+                      ...data.sitrepEntries.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: InkWell(
+                              onTap: () => _showCitations(context, e),
+                              child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: Colors.grey[800]!,
+                                          width: 0.5)),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                  child: Text(
+                                                      "${e.topic.toUpperCase()} // ${e.date}",
+                                                      style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold),
+                                                      overflow: TextOverflow
+                                                          .ellipsis)),
+                                              const Icon(Icons.touch_app,
+                                                  color: Colors.grey, size: 14)
+                                            ]),
+                                        const SizedBox(height: 8),
+                                        _buildRichText(e.summary),
+                                      ])))))
+                    ]))
+          else if (data.summary.isNotEmpty) ...[
             Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -1350,6 +1689,7 @@ class SitRepView extends StatelessWidget {
                             ],
                           )))
                     ]))
+          ]
         ]));
   }
 }
@@ -1359,6 +1699,73 @@ class ForecastView extends StatelessWidget {
   final IntelDetails data;
   final String lang;
   const ForecastView({required this.data, required this.lang, super.key});
+
+  void _showRationale(BuildContext context, ForecastEntry entry) async {
+    final vm = Provider.of<SentinelProvider>(context, listen: false);
+
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF1A1A1A),
+        builder: (ctx) => const SizedBox(
+            height: 150,
+            child: Center(
+                child: CircularProgressIndicator(color: Colors.yellow))));
+
+    final citations = await vm.fetchCitations('forecast', entry.topic);
+    if (context.mounted) Navigator.pop(context);
+
+    if (context.mounted) {
+      showModalBottomSheet(
+          context: context,
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (ctx) => Container(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("ANALYST RATIONALE: ${entry.topic.toUpperCase()}",
+                          style: const TextStyle(
+                              color: Colors.yellow,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 20),
+                      Text(entry.rationale,
+                          style: const TextStyle(
+                              color: Colors.white, height: 1.5)),
+                      const SizedBox(height: 20),
+                      const Divider(color: Colors.grey),
+                      const SizedBox(height: 10),
+                      const Text("HISTORICAL & SOURCE CITATIONS",
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10)),
+                      const SizedBox(height: 10),
+                      if (citations.citations.isEmpty)
+                        const Text("No specific citations linked.",
+                            style: TextStyle(
+                                color: Colors.grey,
+                                fontStyle: FontStyle.italic)),
+                      ...citations.citations.map((c) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(c.source,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            subtitle: Text(c.date,
+                                style: const TextStyle(color: Colors.grey)),
+                            trailing: const Icon(Icons.open_in_new,
+                                color: Colors.blue, size: 18),
+                            onTap: () => launchUrl(Uri.parse(c.url)),
+                          ))
+                    ]),
+              )));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1423,11 +1830,47 @@ class ForecastView extends StatelessWidget {
                         color: Colors.grey,
                         fontSize: 10)),
                 const SizedBox(height: 10),
-                ...pred.forecastSummary.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: Text("• ${s.replaceAll(RegExp(r'^\d+\.\s*'), '')}",
-                          style: const TextStyle(color: Colors.white)),
-                    )),
+                if (data.forecastEntries.isNotEmpty)
+                  ...data.forecastEntries.map((e) => InkWell(
+                        onTap: () => _showRationale(context, e),
+                        child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                                border: Border(
+                                    bottom: BorderSide(
+                                        color: Colors.grey[800]!, width: 0.5))),
+                            child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text(e.topic.toUpperCase(),
+                                            style: const TextStyle(
+                                                color: Colors.yellow,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        Text(e.prediction,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13))
+                                      ])),
+                                  const Icon(Icons.arrow_forward_ios,
+                                      color: Colors.grey, size: 12)
+                                ])),
+                      ))
+                else
+                  ...pred.forecastSummary.map((s) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                            "• ${s.replaceAll(RegExp(r'^\d+\.\s*'), '')}",
+                            style: const TextStyle(color: Colors.white)),
+                      )),
               ],
             ),
           )
@@ -1497,6 +1940,24 @@ class _MapTabState extends State<MapTab> {
         radius = 50000;
       }
 
+      // STALE CHECK
+      bool isStale = false;
+      if (t.lastKinetic != null) {
+        try {
+          DateTime d = DateTime.parse(t.lastKinetic!);
+          if (DateTime.now().difference(d).inHours > 72) {
+            isStale = true; // 3 Days
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+
+      if (isStale) {
+        color = Colors.grey;
+        type = "$type (OLD)";
+      }
+
       if (isForecastMode) {
         color = Colors.orange;
         radius = radius * 1.5;
@@ -1505,8 +1966,8 @@ class _MapTabState extends State<MapTab> {
 
       circles.add(CircleMarker(
           point: LatLng(t.lat, t.lon),
-          color: color.withValues(alpha: 0.2),
-          borderColor: color,
+          color: color.withValues(alpha: isStale ? 0.05 : 0.2),
+          borderColor: color.withValues(alpha: isStale ? 0.5 : 1.0),
           borderStrokeWidth: 2,
           useRadiusInMeter: true,
           radius: radius));
@@ -1516,7 +1977,8 @@ class _MapTabState extends State<MapTab> {
           height: 80, // Increased height for date
           point: LatLng(t.lat, t.lon),
           child: Column(children: [
-            Icon(Icons.warning, color: color, size: 30),
+            Icon(isStale ? Icons.history : Icons.warning,
+                color: color, size: 30),
             Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 color: Colors.black,
@@ -1528,8 +1990,9 @@ class _MapTabState extends State<MapTab> {
                           fontWeight: FontWeight.bold)),
                   if (t.lastKinetic != null)
                     Text(t.lastKinetic!,
-                        style:
-                            const TextStyle(color: Colors.yellow, fontSize: 6))
+                        style: TextStyle(
+                            color: isStale ? Colors.grey : Colors.yellow,
+                            fontSize: 6))
                 ]))
           ])));
     }
@@ -1664,28 +2127,46 @@ class SystemView extends StatelessWidget {
       _sysRow("DATA SOURCES", "Google RSS, OSINT", Colors.white),
       _sysRow("LAST UPDATE", _formatTime(data.lastUpdated), Colors.white),
       const SizedBox(height: 20),
-      if (data.systemUrl != null && data.systemUrl!.isNotEmpty) ...[
-        GestureDetector(
-            onTap: () => _launchWeb(data.systemUrl),
-            child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: Colors.blue[900],
-                    borderRadius: BorderRadius.circular(8)),
-                child: const Center(
-                    child: Text("VISIT WEBSITE",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1))))),
-        const SizedBox(height: 10),
-      ],
+
+      // WEBSITE
+      GestureDetector(
+          onTap: () => _launchWeb(data.systemUrl ?? vm.websiteUrl),
+          child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: Colors.blue[900],
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Center(
+                  child: Text("VISIT WEBSITE",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1))))),
+      const SizedBox(height: 10),
+
+      // DONATE
+      GestureDetector(
+          onTap: () => _launchWeb(data.donateUrl ?? vm.donateUrl),
+          child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: Colors.pink[800],
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Center(
+                  child: Text("DONATE (PAYPAL)",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1))))),
+
+      const SizedBox(height: 10),
+
       GestureDetector(
           onTap: () => _launchEmail(_supportEmail),
           child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                  color: Colors.blue[900],
+                  color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8)),
               child: const Center(
                   child: Text("CONTACT SUPPORT",
