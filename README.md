@@ -3,6 +3,10 @@
 > **🚀 Antigravity Quick Build & Launch Prompt**  
 > For a complete, step-by-step developer guide to launching the full stack (including Mac fixes and credentials), see:  
 > [DEVELOPER_ONBOARDING_LAUNCH_PROMPT.md](DEVELOPER_ONBOARDING_LAUNCH_PROMPT.md)
+>
+> **🤖 AI / Automated Execution Guides (Golden Master)**
+> - [AI_README_LOCALHOST.md](AI_README_LOCALHOST.md) - For Local Development
+> - [AI_README_DEPLOY.md](AI_README_DEPLOY.md) - For VPS Deployment
 
 ## 1. Backend Server (Required)
 The backend powers the API, AI Agency, and Admin Console.

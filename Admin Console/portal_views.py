@@ -18,8 +18,14 @@ from core.db_utils import get_db_handle
 
 # --- CONFIGURATIONPaths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INPUTS_DIR = os.path.join(BASE_DIR, 'Server Backend', 'Developer Inputs')
-STATIC_DIR = os.path.join(BASE_DIR, 'Server Backend', 'core', 'static', 'core') # Adjust as needed
+
+# Docker Compatibility: Check if 'web' exists (Docker), else use 'Server Backend' (Local)
+if os.path.exists(os.path.join(BASE_DIR, 'web', 'Developer Inputs')):
+    INPUTS_DIR = os.path.join(BASE_DIR, 'web', 'Developer Inputs')
+    STATIC_DIR = os.path.join(BASE_DIR, 'web', 'core', 'static', 'core')
+else:
+    INPUTS_DIR = os.path.join(BASE_DIR, 'Server Backend', 'Developer Inputs')
+    STATIC_DIR = os.path.join(BASE_DIR, 'Server Backend', 'core', 'static', 'core')
 
 # --- HELPERS ---
 def get_zones_csv_path(): return os.path.join(INPUTS_DIR, 'Thailand', 'Thailand_Exclusary_Zones.csv')
@@ -34,6 +40,7 @@ def get_contact_path(): return os.path.join(INPUTS_DIR, 'contact.json')
 def is_admin(user):
     return user.is_authenticated and user.is_staff
 
+@csrf_exempt
 def admin_login(request):
     if request.method == 'POST':
         u = request.POST.get('username')

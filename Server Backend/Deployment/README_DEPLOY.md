@@ -1,25 +1,25 @@
 # Deployment Instructions - Digital Ocean VPS
 
 ## Prerequisites
-- SSH Access to the VPS (IP: 68.183.231.91)
-- Local machine has `Sentinel - Server Production` folder.
+- SSH Access to the VPS (IP: 146.190.7.51)
+- Local machine has `Sentinel - Production` folder.
 
 ## Steps
 
 1. **Upload Codebase**
-   Upload the entire `Sentinel - Server Production` directory to the VPS. This ensures all components (Backend, Admin Console) are available for the build.
+   Upload the entire `Sentinel - Production` directory to the VPS. This ensures all components (Backend, Admin Console) are available for the build.
    ```bash
-   scp -r "Sentinel - Server Production" root@68.183.231.91:/root/
+   scp -r "Sentinel - Production" root@146.190.7.51:/root/
    ```
 
 2. **Connect to VPS**
    ```bash
-   ssh root@68.183.231.91
+   ssh root@146.190.7.51
    ```
 
 3. **Navigate to Deployment Folder**
    ```bash
-   cd "Sentinel - Server Production/Server Backend/Deployment"
+   cd "/root/Server Backend/Deployment"
    ```
 
 4. **Run Setup Script**
@@ -36,6 +36,6 @@
    ```
 
 6. **Access Admin Console**
-   - Go to `http://68.183.231.91/admin_portal`
+   - Go to `http://146.190.7.51/admin_portal`
    - Login with the superuser credentials.
    - You will be prompted to setup 2FA.

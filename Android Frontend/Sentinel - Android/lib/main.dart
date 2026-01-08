@@ -24,8 +24,8 @@ import 'package:intl/intl.dart';
 // Web requires localhost.
 
 String get serverUrl {
-  // Production Server
-  return "http://146.190.7.51";
+  // Android Emulator Localhost
+  return "http://10.0.2.2:8000";
 }
 
 const String _supportEmail = "PeterJFrancoIII1@gmail.com";
