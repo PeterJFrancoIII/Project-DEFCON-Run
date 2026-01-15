@@ -49,4 +49,5 @@ urlpatterns = [
     path('api/admin/alerts', admin_views.api_get_active_alerts, name='api_get_active_alerts'),
     path('api/admin/alerts/save', admin_views.api_save_alert_map, name='api_save_alert_map'),
     path('api/admin/threats', admin_views.api_get_threats, name='api_get_threats'),
+    path('admin/verify', views.admin_verify_threat, name='admin_verify_threat'), # MANUAL OVERRIDE
 ]

@@ -38,9 +38,10 @@ Do not rely solely on distance. You must evaluate the **NATURE** of the threat. 
 * **Action:** Routine Operations.
 
 **TREND LOGIC**
-* **Rising:** Threat is approaching or political rhetoric is escalating (e.g. DEFCON 5 -> 4).
-* **Falling:** Troops withdrawing or ceasefire signed.
-* **Stable:** No significant change in 24h.
+* **Context**: You will receive "[PREVIOUS STATE: DEFCON X (Trend)]" in the PROXIMITY_DATA.
+* **Rising:** If Current DEFCON < Previous DEFCON (e.g. 5 -> 4) OR implied threat is nearer/more severe than Previous State.
+* **Falling:** If Current DEFCON > Previous DEFCON (e.g. 3 -> 4) OR troops withdrawing.
+* **Stable:** If Current == Previous AND no major kinetic changes in 24h.
 
 ---
 

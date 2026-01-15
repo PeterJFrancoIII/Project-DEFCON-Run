@@ -1,0 +1,39 @@
+Watching for file changes with StatReloader
+[08/Jan/2026 01:36:52] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 74
+[08/Jan/2026 01:36:59] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:03] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:06] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:10] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:15] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:18] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 62
+[08/Jan/2026 01:37:22] "GET /intel?zip=10110&country=TH HTTP/1.1" 200 5120
+[08/Jan/2026 01:42:51] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 74
+[08/Jan/2026 01:42:54] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:42:57] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:00] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:03] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:06] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:09] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:13] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:16] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:19] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:22] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 62
+[08/Jan/2026 01:43:25] "GET /intel?zip=32110&country=TH&lang=en&device_id=22b50e11-2cc1-44d6-a02b-475ff0fa727b HTTP/1.1" 200 5659
+[08/Jan/2026 01:43:54] "GET /intel/citations?zip=32110&lang=en&type=forecast&key=Diplomatic HTTP/1.1" 200 715
+[08/Jan/2026 01:44:12] "GET /intel/citations?zip=32110&lang=en&type=sitrep&key=sitrep_1 HTTP/1.1" 200 715
+[08/Jan/2026 01:44:23] "GET /intel/citations?zip=32110&lang=en&type=sitrep&key=sitrep_2 HTTP/1.1" 200 715
+[08/Jan/2026 01:44:28] "GET /intel/citations?zip=32110&lang=en&type=sitrep&key=sitrep_3 HTTP/1.1" 200 715
+Performing system checks...
+
+>> [INIT] Loading AI Models...
+System check identified no issues (0 silenced).
+January 08, 2026 - 01:36:48
+Django version 4.1.13, using settings 'core.settings'
+Starting development server at http://0.0.0.0:8000/
+Quit the server with CONTROL-C.
+>> [ANALYST] Generating VERIFIED THREAT REPORT for 10110...
+>> [COMPLIANCE] Loading zones from Thailand_Exclusary_Zones.csv
+>> [COMPLIANCE] Total Active Zones for TH: 16
+>> [DEBUG] Zip: 10110 | TARGET DISTANCE TO THREAT: 208.6 km (Nearest: POIPET (MORTARS))
+>> [ANALYST] Generating VERIFIED THREAT REPORT for 32110...
+>> [DEBUG] Zip: 32110 | TARGET DISTANCE TO THREAT: 67.1 km (Nearest: CHONG CHOM (ROCKETS))

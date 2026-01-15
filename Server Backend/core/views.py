@@ -311,6 +311,22 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             col.replace_one({'zip_code': zip_code}, doc, upsert=True)
             return
 
+        # Fetch Previous Context for Trend Analysis
+        prev_doc = col.find_one({'zip_code': zip_code})
+        prev_defcon = 5
+        prev_trend = "Stable"
+        prev_verified = False
+
+        if prev_doc:
+             try:
+                 prev_intel = prev_doc.get('languages', {}).get('en', {})
+                 prev_defcon = prev_intel.get('defcon_status', 5)
+                 prev_trend = prev_intel.get('predictive', {}).get('forecast_trend', 'Stable')
+                 prev_verified = prev_intel.get('is_certified', False)
+             except: pass
+        
+        context_str = f" [PREVIOUS STATE: DEFCON {prev_defcon} ({prev_trend})]"
+
         news_text, structured_news_data = fetch_news()
 
         # Load Prompt from Developer Inputs
@@ -321,7 +337,7 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
 
         # Calculate Distance to Conflict Zone
         dist_km, nearest_hotzone = get_nearest_hotzone(user_lat, user_lon)
-        dist_info = f"TARGET DISTANCE TO THREAT: {dist_km:.1f} km (Nearest: {nearest_hotzone})"
+        dist_info = f"TARGET DISTANCE TO THREAT: {dist_km:.1f} km (Nearest: {nearest_hotzone}){context_str}"
         print(f">> [DEBUG] Zip: {zip_code} | {dist_info}")
 
         prompt = template.format(
@@ -411,18 +427,28 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         if 'defcon_status' not in master_intel: master_intel['defcon_status'] = 5
         # -----------------------------------------------------------
 
-        # 2. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1)
-        is_certified = True
-        if master_intel.get('defcon_status', 5) == 1:
-            print(">> [SAFETY] DEFCON 1 DETECTED. DOWNGRADING TO 2 PENDING HUMAN REVIEW.")
-            master_intel['defcon_status'] = 2
-            master_intel['summary'].insert(0, "** REPORT PENDING HUMAN VERIFICATION **")
-            is_certified = False
+        # 2. PANIC LAW SAFEGUARD (HITL REQUIRED FOR DEFCON 1 & 2)
+        # Gating: If DEFCON 1 or 2, require verification.
+        # Check against persisted admin approval in 'prev_doc'.
         
-        # New: DEFCON 2 also technically requires human review per new strict rules if needed, 
-        # but for now we trust the downgrade logic. 
-        # Actually, user asked: "Unapporved DEFCON 1-2 Ratings show under the DEFCON rating 'UNCERTIFIED'"
-        # So I should mark checks for status <= 2.
+        is_certified = True
+        new_defcon = master_intel.get('defcon_status', 5)
+        
+        if new_defcon <= 2:
+            # If the previous state was verified AND matches the new level (or worse), we persist approval?
+            # User requirement: "Only remove UNCONFIRMED after admin approval is recorded."
+            # So if we regenerate, we should check if it was ALREADY verified.
+            
+            if prev_verified and prev_defcon == new_defcon:
+                is_certified = True
+                print(f">> [SAFETY] DEFCON {new_defcon} Verified by Persistent Approval.")
+            else:
+                is_certified = False
+                print(f">> [SAFETY] DEFCON {new_defcon} Unconfirmed. Pending HITL.")
+                # We do NOT downgrade the actual integer status anymore, 
+                # we just mark it uncertified so the UI can show the overlay.
+                # User: "System may generate DEFCON 1-2 instantly, but is always flagged UNCONFIRMED"
+                master_intel['summary'].insert(0, "** ALERT: UNCONFIRMED RATING - PENDING HUMAN REVIEW **")
         
         # Pass User Location
         master_intel['is_certified'] = is_certified
@@ -725,3 +751,43 @@ def intel_citations(request, id=None):
 
 
 
+# --- ADMIN OPS ---
+def admin_verify_threat(request):
+    """
+    Manually overrides the 'is_certified' flag for a given Zip Code.
+    Usage: /admin/verify?zip=10110&secret=admin123
+    """
+    try:
+        zip_code = request.GET.get('zip')
+        secret = request.GET.get('secret') 
+        
+        # Basic Security Gate (Replace with real Auth in Produciton)
+        if secret != "admin123":
+             return JsonResponse({'status': 'error', 'message': 'Unauthorized'})
+
+        if not zip_code:
+             return JsonResponse({'status': 'error', 'message': 'Missing Zip'})
+             
+        db = get_db_handle()
+        col = db.intel_history
+        
+        doc = col.find_one({'zip_code': zip_code})
+        if doc:
+             # FLIP BIT
+             doc['languages']['en']['is_certified'] = True
+             
+             # Add admin note to summary if not present
+             summary_list = doc['languages']['en']['summary']
+             msg = "** VERIFIED BY CENTRAL COMMAND **"
+             if msg not in summary_list:
+                 summary_list.insert(0, msg)
+                 
+             # Remove Warning if present
+             doc['languages']['en']['summary'] = [x for x in summary_list if "UNCONFIRMED" not in x]
+
+             col.replace_one({'zip_code': zip_code}, doc)
+             return JsonResponse({'status': 'success', 'message': f'Zip {zip_code} VERIFIED.'})
+        
+        return JsonResponse({'status': 'error', 'message': 'Not Found'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})

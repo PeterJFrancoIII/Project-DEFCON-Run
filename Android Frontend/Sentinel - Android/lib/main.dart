@@ -18,6 +18,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:sentinel_android/services/iap_service.dart';
 
 // --- CONFIGURATION ---
 // CRITICAL FIX: Android Emulator requires 10.0.2.2 to see the Host Mac.
@@ -37,6 +39,25 @@ Future<void> determineServerUrl() async {
   const String localUrl =
       "http://10.0.2.2:8000"; // Correct for Android Emulator
 
+  // 1. Try VPS first (Production Priority)
+  // Check /intel/status to ensure backend is actually ready, not just Nginx.
+  try {
+    debugPrint("[INIT] Checking VPS connectivity: $vpsUrl");
+    final response = await http
+        .get(Uri.parse("$vpsUrl/intel/status"))
+        .timeout(const Duration(seconds: 5)); // Increased to 5s for 4G/latency
+    if (response.statusCode == 200) {
+      debugPrint("[INIT] VPS Reached & Healthy. Using PRODUCTION URL.");
+      _activeServerUrl = vpsUrl;
+      return;
+    } else {
+      debugPrint("[INIT] VPS Reached but returned ${response.statusCode}");
+    }
+  } catch (e) {
+    debugPrint("[INIT] VPS Unreachable: $e");
+  }
+
+  // 2. Fallback to Localhost (Dev Mode)
   try {
     debugPrint("[INIT] Checking LOCAL connectivity: $localUrl");
     final response = await http
@@ -49,18 +70,9 @@ Future<void> determineServerUrl() async {
     }
   } catch (_) {}
 
-  try {
-    debugPrint("[INIT] Local offline. Checking VPS: $vpsUrl");
-    final response =
-        await http.get(Uri.parse(vpsUrl)).timeout(const Duration(seconds: 2));
-    if (response.statusCode == 200 || response.statusCode == 404) {
-      debugPrint("[INIT] VPS Reached. Using PRODUCTION URL.");
-      _activeServerUrl = vpsUrl;
-      return;
-    }
-  } catch (_) {}
-
-  _activeServerUrl = localUrl; // Final Fallback
+  // 3. Last Resort: Default to Localhost (safe failover)
+  debugPrint("[INIT] No servers found. Defaulting to Localhost.");
+  _activeServerUrl = localUrl;
 }
 
 const String _supportEmail = "PeterJFrancoIII1@gmail.com";
@@ -417,6 +429,7 @@ class ThreatZone {
   final double radius;
   final String? type;
   final String? lastKinetic;
+  final String? date;
 
   const ThreatZone(
       {required this.name,
@@ -424,7 +437,8 @@ class ThreatZone {
       required this.lon,
       required this.radius,
       this.type,
-      this.lastKinetic});
+      this.lastKinetic,
+      this.date});
 
   factory ThreatZone.fromJson(Map<String, dynamic> json) {
     return ThreatZone(
@@ -433,7 +447,8 @@ class ThreatZone {
         lon: (json['lon'] as num?)?.toDouble() ?? 0.0,
         radius: (json['radius'] as num?)?.toDouble() ?? 1000.0,
         type: json['type'],
-        lastKinetic: json['last_kinetic']);
+        lastKinetic: json['last_kinetic'],
+        date: json['date']);
   }
 }
 
@@ -650,6 +665,7 @@ class SentinelProvider with ChangeNotifier {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await determineServerUrl();
+  await IAPService().initialize();
   runApp(MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => SentinelProvider())],
       child: const MyApp()));
@@ -749,7 +765,8 @@ Color _getGlobalDefconColor(int level) {
 }
 
 Widget _buildTrendWidget(String? trend) {
-  if (trend == "rising") {
+  final t = trend?.toLowerCase() ?? "stable";
+  if (t == "rising") {
     return const Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.arrow_upward, color: Colors.red, size: 16),
       Text(" RISING",
@@ -757,7 +774,7 @@ Widget _buildTrendWidget(String? trend) {
               color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))
     ]);
   }
-  if (trend == "falling") {
+  if (t == "falling") {
     return const Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.arrow_downward, color: Colors.green, size: 16),
       Text(" FALLING",
@@ -1017,7 +1034,7 @@ class _LandingPageState extends State<LandingPage> {
                         label: Text(Loc.tr("DONATE", vm.userLang),
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 10)),
-                        onPressed: () => _launchURL(vm.donateUrl),
+                        onPressed: () => _handleDonate(context, vm.donateUrl),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.pink,
                             shape: RoundedRectangleBorder(
@@ -1044,43 +1061,192 @@ class _LandingPageState extends State<LandingPage> {
           ),
         ));
   }
+
+  void _handleDonate(BuildContext context, String url) {
+    if (Platform.isIOS) {
+      showCupertinoModalPopup(
+        context: context,
+        builder: (BuildContext context) => CupertinoActionSheet(
+          actions: <CupertinoActionSheetAction>[
+            CupertinoActionSheetAction(
+              child: const Text('Open Sentinel Website <3',
+                  style: TextStyle(color: Colors.pink)),
+              onPressed: () {
+                Navigator.pop(context);
+                _launchURL("https://sentinelcivilianriskanalysis.netlify.app/");
+              },
+            ),
+            CupertinoActionSheetAction(
+              child: const Text('Donate (Apple In-App Purchase)',
+                  style: TextStyle(color: Colors.black)),
+              onPressed: () {
+                Navigator.pop(context);
+                showCupertinoModalPopup(
+                  context: context,
+                  builder: (BuildContext context) => CupertinoActionSheet(
+                    message: const Text('Select a donation amount'),
+                    actions: <CupertinoActionSheetAction>[
+                      for (final tier in [
+                        {
+                          'price': '\$0.99',
+                          'id': 'Sentinel_Donation_Button_0001'
+                        },
+                        {
+                          'price': '\$2.99',
+                          'id': 'Sentinel_Donation_Button_0003'
+                        },
+                        {
+                          'price': '\$4.99',
+                          'id': 'Sentinel_Donation_Button_0005'
+                        },
+                        {
+                          'price': '\$9.99',
+                          'id': 'Sentinel_Donation_Button_0010'
+                        },
+                        {
+                          'price': '\$19.99',
+                          'id': 'Sentinel_Donation_Button_0020'
+                        },
+                      ])
+                        CupertinoActionSheetAction(
+                          child: Text(tier['price']!),
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final success = await IAPService()
+                                .purchaseDonation(tier['id']!);
+                            if (!success && context.mounted) {
+                              showCupertinoDialog(
+                                  context: context,
+                                  builder: (ctx) => CupertinoAlertDialog(
+                                          title: const Text("IAP Unavailable"),
+                                          content: const Text(
+                                              "In-App Purchases are not available on the Simulator or Products failed to load."),
+                                          actions: [
+                                            CupertinoDialogAction(
+                                                child: const Text("OK"),
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx))
+                                          ]));
+                            }
+                          },
+                        ),
+                    ],
+                    cancelButton: CupertinoActionSheetAction(
+                      isDefaultAction: true,
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+        ),
+      );
+    } else {
+      _launchURL(url);
+    }
+  }
+}
+
+// --- LOG VIEWER DIALOG (LIVE POLLING) ---
+class LogViewerDialog extends StatefulWidget {
+  const LogViewerDialog({super.key});
+  @override
+  State<LogViewerDialog> createState() => _LogViewerDialogState();
+}
+
+class _LogViewerDialogState extends State<LogViewerDialog> {
+  String _logs = "Initializing Live Stream...";
+  Timer? _timer;
+  final ScrollController _scrollController = ScrollController();
+  final bool _autoScroll = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLogs();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _fetchLogs());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchLogs() async {
+    if (!mounted) return;
+    final vm = Provider.of<SentinelProvider>(context, listen: false);
+    String newLogs = await vm.fetchServerLogs();
+
+    if (mounted) {
+      setState(() {
+        _logs = newLogs;
+      });
+      // Auto-scroll to bottom if enabled
+      if (_autoScroll && _scrollController.hasClients) {
+        // _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        // Actually, logs usually come reverse or we want to see the end?
+        // User asked for "Live stream". Typically tail -f.
+        // Backend text is usually "last N lines".
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+        backgroundColor: Colors.black,
+        title:
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text("LIVE SERVER LOGS",
+              style: TextStyle(color: Colors.yellow, fontFamily: 'Courier')),
+          Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(5),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.green, blurRadius: 5)
+                  ]))
+        ]),
+        content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: SingleChildScrollView(
+                controller: _scrollController,
+                reverse: true, // Show bottom first (tail)
+                child: Text(_logs,
+                    style: const TextStyle(
+                        color: Colors.green,
+                        fontFamily: 'Courier',
+                        fontSize: 10)))),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("CLOSE CONNECTION"))
+        ]);
+  }
 }
 
 class LoadingPage extends StatelessWidget {
   const LoadingPage({super.key});
 
-  void _showLogs(BuildContext context, SentinelProvider vm) async {
+  void _showLogs(BuildContext context) {
     showDialog(
         context: context,
-        builder: (ctx) => const Center(
-            child: CircularProgressIndicator(color: Colors.yellow)));
-    final logs = await vm.fetchServerLogs();
-    if (context.mounted) Navigator.pop(context);
-
-    if (context.mounted) {
-      showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-                  backgroundColor: Colors.black,
-                  title: const Text("SERVER OUTPUT",
-                      style: TextStyle(
-                          color: Colors.yellow, fontFamily: 'Courier')),
-                  content: SizedBox(
-                      width: double.maxFinite,
-                      height: 400,
-                      child: SingleChildScrollView(
-                          reverse: true,
-                          child: Text(logs,
-                              style: const TextStyle(
-                                  color: Colors.green,
-                                  fontFamily: 'Courier',
-                                  fontSize: 10)))),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text("CLOSE"))
-                  ]));
-    }
+        barrierDismissible: false,
+        builder: (ctx) => const LogViewerDialog());
   }
 
   @override
@@ -1113,8 +1279,8 @@ class LoadingPage extends StatelessWidget {
           right: 20,
           child: IconButton(
               icon: const Icon(Icons.terminal, color: Colors.grey),
-              tooltip: "Server Logs",
-              onPressed: () => _showLogs(context, vm)))
+              tooltip: "Live Server Logs",
+              onPressed: () => _showLogs(context)))
     ]));
   }
 }
@@ -1969,26 +2135,36 @@ class _MapTabState extends State<MapTab> {
           radius: radius));
 
       markers.add(Marker(
-          width: 120,
-          height: 80, // Increased height for date
+          width: 140, // Expanded width
+          height: 90,
           point: LatLng(t.lat, t.lon),
           child: Column(children: [
             Icon(isStale ? Icons.history : Icons.warning,
                 color: color, size: 30),
             Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                color: Colors.black,
+                color: Colors.black.withValues(alpha: 0.8),
                 child: Column(children: [
                   Text(type,
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 8,
-                          fontWeight: FontWeight.bold)),
-                  if (t.lastKinetic != null)
+                          fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center),
+
+                  // NEW: Display Report Date
+                  if (t.date != null)
+                    Text(t.date!,
+                        style: const TextStyle(
+                            color: Colors.yellow,
+                            fontSize: 7,
+                            fontWeight: FontWeight.bold)),
+
+                  if (t.lastKinetic != null && t.date == null)
                     Text(t.lastKinetic!,
                         style: TextStyle(
-                            color: isStale ? Colors.grey : Colors.yellow,
-                            fontSize: 6))
+                            color: isStale ? Colors.grey : Colors.orange,
+                            fontSize: 7))
                 ]))
           ])));
     }
@@ -2142,7 +2318,7 @@ class SystemView extends StatelessWidget {
 
       // DONATE
       GestureDetector(
-          onTap: () => _launchWeb(data.donateUrl ?? vm.donateUrl),
+          onTap: () => _handleDonate(context, data.donateUrl ?? vm.donateUrl),
           child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -2202,6 +2378,99 @@ class SystemView extends StatelessWidget {
       return "${DateFormat("MM/dd/yy HH:mm").format(dt)} UTC";
     } catch (e) {
       return iso;
+    }
+  }
+
+  void _handleDonate(BuildContext context, String url) {
+    if (Platform.isIOS) {
+      showCupertinoModalPopup(
+        context: context,
+        builder: (BuildContext context) => CupertinoActionSheet(
+          actions: <CupertinoActionSheetAction>[
+            CupertinoActionSheetAction(
+              child: const Text('Open Sentinel Website <3',
+                  style: TextStyle(color: Colors.pink)),
+              onPressed: () {
+                Navigator.pop(context);
+                _launchWeb("https://sentinelcivilianriskanalysis.netlify.app/");
+              },
+            ),
+            CupertinoActionSheetAction(
+              child: const Text('Donate (Apple In-App Purchase)',
+                  style: TextStyle(color: Colors.black)),
+              onPressed: () {
+                Navigator.pop(context);
+                showCupertinoModalPopup(
+                  context: context,
+                  builder: (BuildContext context) => CupertinoActionSheet(
+                    message: const Text('Select a donation amount'),
+                    actions: <CupertinoActionSheetAction>[
+                      for (final tier in [
+                        {
+                          'price': '\$0.99',
+                          'id': 'Sentinel_Donation_Button_0001'
+                        },
+                        {
+                          'price': '\$2.99',
+                          'id': 'Sentinel_Donation_Button_0003'
+                        },
+                        {
+                          'price': '\$4.99',
+                          'id': 'Sentinel_Donation_Button_0005'
+                        },
+                        {
+                          'price': '\$9.99',
+                          'id': 'Sentinel_Donation_Button_0010'
+                        },
+                        {
+                          'price': '\$19.99',
+                          'id': 'Sentinel_Donation_Button_0020'
+                        },
+                      ])
+                        CupertinoActionSheetAction(
+                          child: Text(tier['price']!),
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final success = await IAPService()
+                                .purchaseDonation(tier['id']!);
+                            if (!success && context.mounted) {
+                              showCupertinoDialog(
+                                  context: context,
+                                  builder: (ctx) => CupertinoAlertDialog(
+                                          title: const Text("IAP Unavailable"),
+                                          content: const Text(
+                                              "In-App Purchases are not available on the Simulator or Products failed to load."),
+                                          actions: [
+                                            CupertinoDialogAction(
+                                                child: const Text("OK"),
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx))
+                                          ]));
+                            }
+                          },
+                        ),
+                    ],
+                    cancelButton: CupertinoActionSheetAction(
+                      isDefaultAction: true,
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+        ),
+      );
+    } else {
+      _launchWeb(url);
     }
   }
 }
