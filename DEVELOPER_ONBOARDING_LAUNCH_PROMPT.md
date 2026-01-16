@@ -73,17 +73,70 @@ Ensure your development environment has the following installed:
     *   **API**: `http://localhost:8000`
 
 #### 2. Mobile Application (Android/iOS)
+
+**⚠️ Flutter Installation Required**: If you see `flutter: command not found`, install Flutter first:
+
+**For macOS:**
+1.  **Install Flutter SDK**:
+    *   **Option A - Using Homebrew** (Recommended):
+        ```bash
+        brew install --cask flutter
+        ```
+    *   **Option B - Manual Installation**:
+        ```bash
+        # Download Flutter SDK
+        cd ~/development
+        git clone https://github.com/flutter/flutter.git -b stable
+        # Add to PATH (add this to your ~/.zshrc or ~/.bash_profile)
+        export PATH="$PATH:$HOME/development/flutter/bin"
+        source ~/.zshrc  # or source ~/.bash_profile
+        ```
+
+2.  **Verify Installation**:
+    ```bash
+    flutter --version
+    flutter doctor
+    ```
+    *   `flutter doctor` will show what additional tools you need (Xcode for iOS, Android Studio for Android, etc.)
+
+3.  **Install Additional Tools** (as needed):
+    *   **For iOS Development** (macOS only):
+        *   Install Xcode from App Store
+        *   Run: `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
+        *   Run: `sudo xcodebuild -runFirstLaunch`
+        *   Install CocoaPods: `sudo gem install cocoapods`
+    
+    *   **For Android Development**:
+        *   Install [Android Studio](https://developer.android.com/studio)
+        *   Open Android Studio → More Actions → SDK Manager
+        *   Install Android SDK Platform-Tools and at least one Android SDK (API 33+ recommended)
+        *   Accept Android licenses: `flutter doctor --android-licenses`
+
+**Once Flutter is installed:**
+
 1.  Navigate to the project directory:
     ```bash
     cd "Android Frontend/Sentinel - Android"
     ```
+
 2.  Install dependencies:
     ```bash
     flutter pub get
     ```
-3.  Run the app:
-    *   **Android**: Launch an Emulator (`emulator-5554` recommended) or device.
-    *   Run: `flutter run`
+
+3.  **Check available devices**:
+    ```bash
+    flutter devices
+    ```
+
+4.  Run the app:
+    *   **Android**: 
+        *   Start an Android Emulator from Android Studio, or connect a physical device via USB with USB debugging enabled
+        *   Run: `flutter run`
+    *   **iOS** (macOS only):
+        *   Start iOS Simulator: `open -a Simulator` or via Xcode
+        *   Run: `flutter run`
+    *   **Select a device** if multiple are available: `flutter run -d <device-id>`
 
 #### 3. Investor Website
 1.  Navigate to directory:
