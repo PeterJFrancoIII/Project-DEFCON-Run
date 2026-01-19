@@ -40,6 +40,7 @@ docker-compose.override.yml
 *.swp
 
 # Credentials
+google_creds.json
 service_account.json
 *.json
 !package.json
