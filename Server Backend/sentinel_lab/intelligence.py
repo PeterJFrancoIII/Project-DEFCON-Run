@@ -167,7 +167,7 @@ def fetch_gdelt_events(hours_back=24):
             ActionGeo_CountryCode
         FROM `gdelt-bq.gdeltv2.events`
         WHERE
-            (ActionGeo_CountryCode = 'TH' OR ActionGeo_CountryCode = 'CB')
+            (ActionGeo_CountryCode = 'UP')  -- Ukraine
             AND (
                 -- RED ZONE: Active Kinetic Conflict (Roots 18, 19, 20)
                 EventRootCode IN ('18', '19', '20')
@@ -279,7 +279,7 @@ def debug_fetch_gdelt(hours_back=24):
         ActionGeo_CountryCode
     FROM `gdelt-bq.gdeltv2.events`
     WHERE
-        (ActionGeo_CountryCode = 'TH' OR ActionGeo_CountryCode = 'CB')
+        (ActionGeo_CountryCode = 'UP')  -- Ukraine
         AND (
             -- RED ZONE: Active Kinetic Conflict (Roots 18, 19, 20)
             EventRootCode IN ('18', '19', '20')

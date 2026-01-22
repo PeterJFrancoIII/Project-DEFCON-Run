@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --background: #0a0a0f;
+    --card-bg: #12121a;
+    --border: #1e1e2a;
+    --text: #f0f0f5;
+    --text-muted: #8888aa;
+    --accent-blue: #3b82f6;
+    --accent-yellow: #eab308;
+    --news-color: #22c55e;
+    --gdelt-color: #6366f1;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-news {
+    background: var(--news-color);
+    color: white;
+}
+
+.btn-news:hover {
+    background: #16a34a;
+}
+
+.btn-news:disabled {
+    background: #166534;
+    cursor: wait;
+}
+
+.btn-gdelt {
+    background: var(--gdelt-color);
+    color: white;
+}
+
+.btn-gdelt:hover {
+    background: #4f46e5;
+}
+
+.btn-gdelt:disabled {
+    background: #3730a3;
+    cursor: wait;
+}
+
+.btn-secondary {
+    background: #27272a;
+    color: #a1a1aa;
+    border: 1px solid #3f3f46;
+}
+
+.btn-secondary:hover {
+    background: #3f3f46;
+    color: white;
+}
+
+.panel-news {
+    border-left: 3px solid var(--news-color);
+}
+
+.panel-gdelt {
+    border-left: 3px solid var(--gdelt-color);
+}
+
+.feed-item {
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    transition: border-color 0.2s;
+}
+
+.feed-item:hover {
+    border-color: #3f3f46;
+}
+
+.threat-red {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.4);
+}
+
+.threat-orange {
+    background: rgba(234, 88, 12, 0.15);
+    border-color: rgba(234, 88, 12, 0.4);
+}
+
+.threat-yellow {
+    background: rgba(234, 179, 8, 0.15);
+    border-color: rgba(234, 179, 8, 0.4);
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-red {
+    background: #dc2626;
+    color: white;
+}
+
+.badge-orange {
+    background: #ea580c;
+    color: white;
+}
+
+.badge-yellow {
+    background: #ca8a04;
+    color: black;
+}
+
+.badge-gray {
+    background: #52525b;
+    color: white;
+}
