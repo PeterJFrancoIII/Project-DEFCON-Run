@@ -25,6 +25,10 @@ from dateutil import parser as date_parser
 from bson.son import SON 
 from . import geo_utils
 from django.views.decorators.csrf import csrf_exempt
+from .atlas_schema import SourceTier, IngestMethod, ProcessingStatus
+from .gates.gate_1_ingest import Gate1Ingest
+from .gates.gate_2_base import Gate2Base
+from .gates.gate_2_reinforced import Gate2Reinforced
 
 # --- CONFIGURATION ---
 # Import from the adjacent Developer Inputs folder
@@ -110,107 +114,79 @@ def fetch_custom_osint():
 def get_msg_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
-# --- NEWS & ANT-DRIFT (DB BACKED) ---
-def fetch_news():
-    update_status("Fetching Sources")
-    structured_news = []
+# --- ATLAS G3 PIPELINE ---
+def run_atlas_pipeline():
+    """
+    ATLAS G3 ORCHESTRATOR
+    Replaces legacy fetch_news() with a Multi-Agent Pipeline.
+    """
+    update_status("Atlas G3: Ingesting")
+    
+    # Initialize Gates
+    gate1 = Gate1Ingest()
+    gate2_base = Gate2Base()
+    gate2_reinforced = Gate2Reinforced()
+    
+    clean_packets = []
     formatted_headlines = []
     
     try:
         if hasattr(ssl, '_create_unverified_context'):
             ssl._create_default_https_context = ssl._create_unverified_context
         
-        # STRICT KINETIC KEYWORDS
+        # 1. INGEST (RSS Source) - Same query as before
         query = "Thailand Cambodia border shelling OR artillery OR mortar OR drone attack OR firefight OR explosion OR clash"
         url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-US&gl=US&ceid=US:en"
         
         feed = feedparser.parse(url)
         
-        db = get_db_handle()
-        news_col = db.news_index
+        if not feed.entries:
+            return "No recent reports.", []
+
+        # 2. PIPELINE EXECUTION
+        print(f">> [ATLAS] Processing {len(feed.entries)} items...")
         
-        now_utc = datetime.datetime.now(pytz.utc)
-        min_date = now_utc - datetime.timedelta(days=3) # Ignore news older than 3 days
-        
-        if feed.entries:
-            for entry in feed.entries[:30]:
-                # 1. Normalize Date (UTC)
-                try:
-                    pub_date = date_parser.parse(entry.get('published', str(datetime.datetime.now())))
-                    if pub_date.tzinfo is None: 
-                        pub_date = pub_date.replace(tzinfo=pytz.utc)
-                    else: 
-                        pub_date = pub_date.astimezone(pytz.utc)
-                except:
-                    pub_date = now_utc
-
-                # 2. Check Age
-                if pub_date < min_date:
-                    continue
-
-                # 3. Check Drift (Duplicate Detection)
-                # We use Canonical URL (if available) or Link, plus Title Hash
-                canonical = entry.get('link', '')
-                title_clean = entry.title.strip().lower()
+        for entry in feed.entries[:30]: # Cap at 30 for speed
+            
+            # GATE 1: INGEST & DEDUP
+            packet = gate1.process_packet(
+                raw_input=entry,
+                source_id="google_news_rss",
+                source_tier=SourceTier.TRUSTED_MEDIA, # Google News Aggregation
+                ingest_method=IngestMethod.RSS
+            )
+            
+            if not packet:
+                continue # Dropped by Gate 1 (Duplicate)
                 
-                url_hash = get_msg_hash(canonical)
-                title_hash = get_msg_hash(title_clean)
-                
-                # DB LOOKUP
-                # Check if we have seen this content hash before
-                existing_doc = news_col.find_one({
-                    "$or": [
-                        {"url_hash": url_hash}, 
-                        {"title_hash": title_hash}
-                    ]
-                })
-
-                if existing_doc:
-                    # DRIFT LOGIC: If existing is OLD (> 24h) but this entry is NEW, it might be recycled.
-                    # HOWEVER, RSS feeds often re-publish.
-                    # We only accept it if the pub_date is significantly newer than the stored 'first_seen' 
-                    # AND the content suggests a new event (hard to do without checking content).
-                    # Safest approach for "Drift": Reject duplicates.
-                    
-                    # Update 'last_seen'
-                    news_col.update_one(
-                        {"_id": existing_doc["_id"]}, 
-                        {"$set": {"last_seen_at_utc": now_utc.isoformat()}}
-                    )
-                    continue 
-                
-                # INSERT NEW
-                news_doc = {
-                    "url_hash": url_hash,
-                    "title_hash": title_hash,
-                    "title": entry.title,
-                    "link": entry.link,
-                    "source": entry.get('source', {}).get('title', 'Google News'),
-                    "published_at_utc": pub_date.isoformat(),
-                    "first_seen_at_utc": now_utc.isoformat(),
-                    "last_seen_at_utc": now_utc.isoformat(),
-                    "status": "Unconfirmed" # Default label
-                }
-                news_col.insert_one(news_doc)
-                
-                news_item = {
-                    "id": url_hash[:8], 
-                    "title": entry.title,
-                    "date": pub_date.isoformat(),
-                    "source": entry.get('source', {}).get('title', 'Google News'),
-                    "link": entry.link
-                }
-                structured_news.append(news_item)
-                formatted_headlines.append(f"[ID: {news_item['id']}] {news_item['title']} ({news_item['date']})")
+            # GATE 2: BASE (CLASSIFY)
+            packet = gate2_base.process_packet(packet)
+            
+            # GATE 2: REINFORCED (VERIFY MAYBES)
+            if packet.triage.processing_status == ProcessingStatus.PENDING_REINFORCED:
+                update_status("Atlas G3: Verifying")
+                packet = gate2_reinforced.process_packet(packet)
+            
+            # FINAL COLLECTION
+            if packet.triage.processing_status == ProcessingStatus.CLEAN:
+                clean_packets.append(packet)
+                # Format for Analyst Prompt
+                formatted_headlines.append(
+                    f"[ID: {packet.identity.artifact_id[:8]}] {packet.payload.title} "
+                    f"(Score: {packet.triage.validity_score}, Domain: {packet.triage.risk_domain.value})"
+                )
+                print(f"   + ADMIT: {packet.payload.title[:30]}")
+            else:
+                print(f"   - DROP: {packet.payload.title[:30]} ({packet.triage.processing_status.value})")
 
     except Exception as e:
-        formatted_headlines.append(f"News Error: {e}")
-        print(f"[!] News Fetch Error: {e}")
-    
-    if not formatted_headlines: 
-        return "No recent kinetic reports.", []
+        print(f"[ATLAS] Orchestrator Error: {e}")
+        traceback.print_exc()
+
+    if not clean_packets:
+        return "No strictly verified reports found.", []
         
-    return "\n".join(formatted_headlines[:40]), structured_news[:40]
+    return "\n".join(formatted_headlines), clean_packets
 
 # --- SERVER OBSERVABILITY (DB BACKED) ---
 def update_status(stage):
@@ -311,7 +287,7 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
             col.replace_one({'zip_code': zip_code}, doc, upsert=True)
             return
 
-        news_text, structured_news_data = fetch_news()
+        news_text, clean_packets = run_atlas_pipeline()
 
         # Load Prompt from Developer Inputs
         prompt_path = os.path.join(INPUTS_DIR, 'analyst_system_prompt.txt')
@@ -721,7 +697,93 @@ def intel_citations(request, id=None):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+# --- DEBUG: ATLAS G3 PIPELINE ---
+def debug_pipeline(request):
+    """
+    Debug endpoint for Atlas G3 Dashboard.
+    Runs the pipeline and returns detailed packet data for visualization.
+    """
+    try:
+        # Initialize Gates
+        gate1 = Gate1Ingest()
+        gate2_base = Gate2Base()
+        gate2_reinforced = Gate2Reinforced()
         
-
-
-
+        all_packets = []  # Track ALL packets, not just clean ones
+        
+        if hasattr(ssl, '_create_unverified_context'):
+            ssl._create_default_https_context = ssl._create_unverified_context
+        
+        query = "Thailand Cambodia border shelling OR artillery OR mortar OR drone attack OR firefight OR explosion OR clash"
+        url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-US&gl=US&ceid=US:en"
+        
+        feed = feedparser.parse(url)
+        
+        if not feed.entries:
+            return JsonResponse({
+                'status': 'success',
+                'message': 'No items in RSS feed',
+                'total_processed': 0,
+                'total_clean': 0,
+                'packets': []
+            })
+        
+        for entry in feed.entries[:20]:  # Limit for debug
+            packet_data = {
+                'title': entry.title[:100],
+                'content_hash': None,
+                'status': 'RAW',
+                'validity_score': 0,
+                'risk_domain': 'UNCLASSIFIED',
+                'target_region': 'UNKNOWN',
+                'gate_history': []
+            }
+            
+            # GATE 1
+            packet = gate1.process_packet(
+                raw_input=entry,
+                source_id="google_news_rss",
+                source_tier=SourceTier.TRUSTED_MEDIA,
+                ingest_method=IngestMethod.RSS
+            )
+            
+            if not packet:
+                packet_data['gate_history'].append('GATE1_DROP_DUPLICATE')
+                packet_data['status'] = 'DROP'
+                all_packets.append(packet_data)
+                continue
+            
+            packet_data['content_hash'] = packet.identity.content_hash
+            packet_data['gate_history'] = list(packet.triage.gate_history)
+            
+            # GATE 2 BASE
+            packet = gate2_base.process_packet(packet)
+            packet_data['validity_score'] = packet.triage.validity_score
+            packet_data['risk_domain'] = packet.triage.risk_domain.value
+            packet_data['target_region'] = packet.triage.target_region
+            packet_data['gate_history'] = list(packet.triage.gate_history)
+            packet_data['status'] = packet.triage.processing_status.value
+            
+            # GATE 2 REINFORCED (if needed)
+            if packet.triage.processing_status == ProcessingStatus.PENDING_REINFORCED:
+                packet = gate2_reinforced.process_packet(packet)
+                packet_data['validity_score'] = packet.triage.validity_score
+                packet_data['gate_history'] = list(packet.triage.gate_history)
+                packet_data['status'] = packet.triage.processing_status.value
+            
+            all_packets.append(packet_data)
+        
+        clean_count = sum(1 for p in all_packets if p['status'] == 'CLEAN')
+        
+        return JsonResponse({
+            'status': 'success',
+            'total_processed': len(all_packets),
+            'total_clean': clean_count,
+            'packets': all_packets
+        })
+        
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
