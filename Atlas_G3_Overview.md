@@ -43,7 +43,7 @@ The pipeline processes raw data into verified intelligence through three strictl
 |-----------|----------------|
 | **Orchestrator** | Python / Django (`views.py`) |
 | **Data Contract** | Pydantic (`atlas_schema.py`) |
-| **Storage** | MongoDB (`news_index`, `raw_news_db`) |
+| **Storage** | MongoDB (`raw_news_db` & `clean_news_db`) |
 | **LLMs** | Google Gemini 2.5 & 3.0 |
 | **Observability** | Next.js Dashboard (`newosintdashboard`) |
 
@@ -52,10 +52,11 @@ The pipeline processes raw data into verified intelligence through three strictl
 ```mermaid
 graph LR
     A[Raw RSS] -->|Packet| B(Gate 1: Ingest)
-    B -->|Unique| C{Gate 2: Base}
+    B -->|Unique| R[(Raw News DB)]
+    R --> C{Gate 2: Base}
     B -->|Duplicate| X[DROP]
     
-    C -->|Score > 66| D[CLEAN DB]
+    C -->|Score > 66| D[(Clean News DB)]
     C -->|Score < 33| X
     C -->|Score 33-66| E{Gate 2: Reinforced}
     

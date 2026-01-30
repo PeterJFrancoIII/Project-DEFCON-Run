@@ -185,6 +185,23 @@ def run_atlas_pipeline():
 
     if not clean_packets:
         return "No strictly verified reports found.", []
+
+    # --- 3. PERSISTENCE (Clean News Database) ---
+    try:
+        db = get_db_handle()
+        clean_db = db['clean_news_db']
+        
+        for p in clean_packets:
+            # Upsert based on artifact_id to prevent duplicates if re-processed
+            clean_db.replace_one(
+                {"identity.artifact_id": p.identity.artifact_id},
+                p.dict(),
+                upsert=True
+            )
+        print(f">> [ATLAS] Persisted {len(clean_packets)} Clean Packets to DB.")
+        
+    except Exception as e:
+        print(f"[ATLAS] DB Write Error: {e}")
         
     return "\n".join(formatted_headlines), clean_packets
 
