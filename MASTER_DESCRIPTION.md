@@ -1,11 +1,12 @@
 # Ultra Master Program Descriptor for LLM Ingestion
 
-## 1. System Identity & Core Directive (`/ROOT`)
+## 1. System Identity & Core Directive
 
-*   **System Name:** SENTINEL Defense System
-*   **Version:** 1.0.34 (Production)
-*   **Primary Directive:** To mitigate civilian risk in high-kinetic conflict zones by providing real-time, AI-verified intelligence, predictive forecasting, and evacuation logistics.
-*   **Operational Philosophy:** "Safety over Speed." The system employs a **Human-In-The-Loop (HITL)** architecture where high-severity alerts (DEFCON 1-2) are artificially gated until human verification is received.
+- **System Name:** SENTINEL Defense System
+- **Version:** 1.0.34 (Production)
+- **Repository:** [GitHub - Project-DEFCON-Run](https://github.com/PeterJFrancoIII/Project-DEFCON-Run)
+- **Primary Directive:** To mitigate civilian risk in high-kinetic conflict zones by providing real-time, AI-verified intelligence, predictive forecasting, and evacuation logistics.
+- **Operational Philosophy:** "Safety over Speed." The system employs a **Human-In-The-Loop (HITL)** architecture where high-severity alerts (DEFCON 1-2) are artificially gated until human verification is received.
 
 ---
 
@@ -13,47 +14,148 @@
 
 The system operates on a decentralized **Client-Server-Controller** topology.
 
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SENTINEL ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│    ┌─────────────────┐         ┌─────────────────┐                      │
+│    │  Tactical       │         │  Command        │                      │
+│    │  Interface      │◄───────►│  Controller     │                      │
+│    │  (Flutter)      │         │  (Django Admin) │                      │
+│    └────────┬────────┘         └────────┬────────┘                      │
+│             │                           │                                │
+│             │         ┌─────────────────┴────────────────┐              │
+│             │         │      Intelligence Node            │              │
+│             └────────►│      (Django Backend)             │◄────────┐   │
+│                       │                                   │         │   │
+│                       │  ┌─────────────────────────────┐ │         │   │
+│                       │  │ Atlas G3 Pipeline           │ │         │   │
+│                       │  │ Gate1 → Gate2Base → Gate2R  │ │         │   │
+│                       │  └─────────────────────────────┘ │         │   │
+│                       │                                   │         │   │
+│                       │  ┌─────────────────────────────┐ │         │   │
+│                       │  │ Jobs V2 Module              │ │         │   │
+│                       │  │ Auth → Listings → Apps      │ │         │   │
+│                       │  └─────────────────────────────┘ │         │   │
+│                       └─────────────────┬────────────────┘         │   │
+│                                         │                           │   │
+│                       ┌─────────────────┴────────────────┐         │   │
+│                       │           MongoDB                 │         │   │
+│                       │  sentinel_intel | jobs_users     │         │   │
+│                       │  jobs_posts | jobs_applications  │         │   │
+│                       └──────────────────────────────────┘         │   │
+│                                                                     │   │
+│    ┌─────────────────┐                                             │   │
+│    │    Website      │─────────────────────────────────────────────┘   │
+│    │    (React)      │                                                  │
+│    └─────────────────┘                                                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 2.1. The Intelligence Node (`/Server Backend`)
-*   **Role:** The "Brain". Handles data ingestion, deductive reasoning, and state persistence.
-*   **Tech Stack:** Python 3.9+, Django 4.1.13, MongoDB (Application Data), SQLite (Session Data).
-*   **AI Engine:** Google Gemini 3 Pro (Reasoning), Gemini 2.5 Flash (Translation).
-*   **Key Libraries:** `genai`, `shapely` (Geospatial), `feedparser` (OSINT), `pymongo`.
+- **Role:** The "Brain". Handles data ingestion, deductive reasoning, and state persistence.
+- **Tech Stack:** Python 3.9+, Django 4.1.13, MongoDB (Application Data), SQLite (Session Data).
+- **AI Engine:** 
+  - Gemini 3 Pro (Main Analyst & Jobs Analyst)
+  - Gemini 2.5 Flash Lite (Translation & Gate 1)
+  - Gemini 2.5 Flash (Gate 2 Base)
+  - Gemini 3 Flash (Gate 2 Reinforced)
+- **Key Libraries:** `genai`, `shapely` (Geospatial), `feedparser` (OSINT), `pymongo`.
 
 ### 2.2. The Tactical Interface (`/Android Frontend`)
-*   **Role:** The "Face". Visualizes threat vectors and provides navigation.
-*   **Tech Stack:** Flutter (Dart), Provider (State Management), `flutter_map` (OpenStreetMap).
-*   **Key Logic:** Ephemeral ID rotation (PDPA), Offline-First Architecture, Polling intervals (15s).
+- **Role:** The "Face". Visualizes threat vectors and provides navigation.
+- **Tech Stack:** Flutter (Dart), Provider (State Management), `flutter_map` (OpenStreetMap).
+- **Key Logic:** Ephemeral ID rotation (PDPA), Offline-First Architecture, Polling intervals (15s).
 
 ### 2.3. The Command Controller (`/Admin Console`)
-*   **Role:** The "Gavel". Allows human override of AI decisions.
-*   **Tech Stack:** Django Templates, HTMX, Bootstrap 5.
-*   **Key Logic:** 2FA (TOTP) Authentication, Prompt Injection, Exclusion Zone Management.
+- **Role:** The "Gavel". Allows human override of AI decisions.
+- **Tech Stack:** Django Templates, HTMX, Bootstrap 5.
+- **Key Logic:** 2FA (TOTP) Authentication, Prompt Injection, Exclusion Zone Management.
+
+### 2.4. The Website (`/Website`)
+- **Role:** Public-facing marketing and information portal.
+- **Tech Stack:** React, Vite, TypeScript.
+- **Key Features:** System status display, investor access, donation portal.
 
 ---
 
-## 3. Data Schema Registry (The DNA)
+## 3. Core Modules
 
-All modules must strictly adhere to these JSON schemas.
+### 3.1. Atlas G3 Pipeline (`/Server Backend/core/gates`)
 
-### 3.1. Master Intelligence Object (`IntelDetails`)
-This object is generated by the Server and consumed by the Client.
+The multi-gate news verification system:
+
+| Gate | File | AI Model | Purpose |
+|------|------|----------|---------|
+| Gate 1 | `gate_1_ingest.py` | Gemini 2.5 Flash Lite | Initial ingestion, translation, deduplication |
+| Gate 2 Base | `gate_2_base.py` | Gemini 2.5 Flash | Threat classification, DEFCON assessment |
+| Gate 2 Reinforced | `gate_2_reinforced.py` | Gemini 3 Flash | High-confidence verification for DEFCON 1-2 |
+
+**Pipeline Flow:**
+```
+RSS/News Feed → Gate 1 (Ingest) → Gate 2 Base (Classify) → Gate 2 Reinforced (Verify) → MongoDB
+```
+
+### 3.2. Jobs V2 Module (`/Server Backend/jobs_v2`)
+
+Employment platform connecting workers with crisis-response organizations.
+
+**API Structure:**
+| View File | Endpoints |
+|-----------|-----------|
+| `views/auth.py` | Login, Register, Token management |
+| `views/listings.py` | Create, Search, Filter job postings |
+| `views/applications.py` | Apply, Accept, Reject, Chat messaging |
+| `views/admin.py` | Employer verification, user management |
+| `views/moderation.py` | Reporting and content moderation |
+| `views/uploads.py` | File/image upload handling |
+
+**Application Lifecycle:**
+```
+applied → pending (Chat Unlock) → accepted (Contractual) → completed
+```
+
+**Key Constraints:**
+- Chat is STRICTLY disabled until status is `pending` or `accepted`
+- Employers must be admin-verified before posting jobs
+- Notification settings customizable for "Pending" vs "Non-Pending" alerts
+
+### 3.3. MongoDB Collections
+
+| Collection | Purpose |
+|------------|---------|
+| `sentinel_intel` | Threat intelligence data |
+| `intel_history` | Historical intelligence records |
+| `news_index` | OSINT news with MD5 deduplication |
+| `system_status` | Server health and observability |
+| `jobs_users` | Jobs V2 user accounts |
+| `jobs_posts` | Job listings |
+| `jobs_applications` | Worker applications |
+
+---
+
+## 4. Data Schema Registry
+
+### 4.1. Master Intelligence Object (`IntelDetails`)
 
 ```json
 {
-  "zip_code": "10110", // (String) Target Sector
-  "country": "TH", // (String) ISO 2 Code
-  "defcon_status": 3, // (Int) 1=War ... 5=Peace
-  "is_certified": false, // (Bool) True ONLY if Admin POSTs approval
+  "zip_code": "10110",
+  "country": "TH",
+  "defcon_status": 3,
+  "is_certified": false,
   "summary": [
-    "ASSESSMENT: Artillery detected in Preah Vihear sector.", // AI Deductions
-    "** ALERT: UNCONFIRMED RATING **" // System Warnings
+    "ASSESSMENT: Artillery detected in Preah Vihear sector.",
+    "** ALERT: UNCONFIRMED RATING **"
   ],
   "tactical_overlays": [
     {
       "name": "Preah Vihear",
       "lat": 14.3914, "lon": 104.6804,
-      "radius": 40000.0, // Meters
-      "type": "Artillery", // Determines UI Color/Icon
+      "radius": 40000.0,
+      "type": "Artillery",
       "last_kinetic": "2025-12-15"
     }
   ],
@@ -65,9 +167,9 @@ This object is generated by the Server and consumed by the Client.
   },
   "predictive": {
     "forecast_summary": ["Expect escalation within 24h."],
-    "forecast_trend": "Rising", // Enum: Rising, Stable, Falling
-    "risk_probability": 85, // Int 0-100
-    "defcon": 2 // Forecasted DEFCON
+    "forecast_trend": "Rising",
+    "risk_probability": 85,
+    "defcon": 2
   },
   "sitrep_entries": [
     { "id": "a1b2", "topic": "Shelling", "summary": "...", "date": "..." }
@@ -79,183 +181,122 @@ This object is generated by the Server and consumed by the Client.
 }
 ```
 
-### 3.2. Exclusion Zone Object (Compliance)
-Defined in `Thailand_Exclusary_Zones.csv` and loaded into Shapely.
+### 4.2. Jobs User Object
 
 ```json
 {
-  "zone_name": "Royal Palace No-Fly",
-  "risk_level": "HIGH",
-  "shape_type": "CIRCLE", // or RECTANGLE
-  "lat_center": 13.75,
-  "lng_center": 100.50,
-  "radius_km": 5.0
+  "_id": "ObjectId",
+  "user_id": "usr_1234567890",
+  "email": "user@example.com",
+  "password_hash": "bcrypt_hash",
+  "role": "worker|employer|both",
+  "display_name": "John Doe",
+  "organization_name": "Relief Org",
+  "organization_type": "NGO|Government|Private",
+  "employer_verified": true,
+  "employer_verified_at": "2026-01-15T10:00:00Z",
+  "notification_settings": {
+    "pending_alerts": true,
+    "non_pending_alerts": false
+  },
+  "created_at": "2026-01-01T00:00:00Z"
 }
 ```
 
 ---
 
-## 4. Module Logic Specification
+## 5. AI Prohibitions (CRITICAL)
 
-### 4.1. Server Backend: The Conflict Agent (`scripts/conflict_agent.py`)
-This script is the core intelligence loop.
+These rules are **IMMUTABLE** and must never be bypassed by any AI agent:
 
-1.  **Ingestion (`fetch_news`)**:
-    *   Scrapes Google News RSS for kinetic keywords: `shelling | troop movement | artillery`.
-    *   **Drift Filter**: MD5 hashes (Title + Link) are checked against `news_index`. Duplicate hashes update `last_seen` but are NOT passed to the AI.
-2.  **Geospatial Resolution (`ZoneResolver`)**:
-    *   Resolves Zip Code -> Lat/Lon via CSV lookup.
-    *   Calculates `dist_km` to nearest rigid `HOTZONE` (defined in `geo_utils.py`) using Haversine formula.
-3.  **The Compliance Gate (`core.compliance`)**:
-    *   Input: User Lat/Lon.
-    *   Action: Checks if point exists within any `Shapely` polygon defined in `Developer Inputs`.
-    *   **Result**: If Inside -> **HARD BLOCK**. Returns "Restricted Zone" placeholder. No AI generation occurs.
-4.  **AI Orchestration (`run_mission_logic`)**:
-    *   Constructs Prompt: `Context (Zip/Dist) + News Text + System Prompt`.
-    *   Invokes: `gemini-3-pro-preview`.
-    *   **The Panic Filter**: If AI output `defcon <= 2`, system checks specific `is_certified` bit in DB. If false, **DOWNGRADE** status in UI (marked UNCONFIRMED) but preserve internal risk rating.
-5.  **Persistence**:
-    *   Saves final JSON to `intel_history` collection.
-    *   Updates `system_status` for observability.
-
-### 4.2. Android Frontend: The Watchman (`lib/main.dart`)
-This is a `ChangeNotifier` state machine.
-
-1.  **State Initialization (`determineServerUrl`)**:
-    *   Pings `146.190.7.51/intel/status`.
-    *   Success (200 OK) -> Sets `serverUrl` to VPS.
-    *   Timeout/Error -> Sets `serverUrl` to `10.0.2.2:8000` (Android Emulator Localhost).
-    *   This logic allows seamless transition between Dev and Prod without code changes.
-2.  **Identity Rotation (`SentinelProvider`)**:
-    *   Generates `UUIDv4`.
-    *   Checks `IDCreatedDate` in SharedPreferences.
-    *   If `Now - Created > 24h` -> **ROTATE ID**. (Privacy Compliance).
-3.  **Visualization Logic (`DashboardPage`)**:
-    *   **Rings**: `CustomPainter` draws expanding rings. Pulse rate derived from `(6 - defcon_status)`.
-    *   **Map**: `FlutterMap` renders `CircleMarker` layers from `tactical_overlays` array.
-    *   **Colors**: 
-        *   Artillery/Conflict = `Colors.red.withOpacity(0.3)`
-        *   Troop Movement = `Colors.yellow.withOpacity(0.3)`
-
-### 4.3. Admin Console: The Actuator (`portal_views.py`)
-1.  **Gatekeeper**: `is_staff` check + `TOTPDevice` (2FA) required for all write ops.
-2.  **Override API (`api_decide_approval`)**:
-    *   `POST /api/admin/approvals/decide`
-    *   Accepts: `{ "zip_code": "...", "action": "APPROVE" }`
-    *   Logic: Finds doc in `intel_history`, sets `is_certified = True`, sets `defcon = 1`.
-3.  **Zone Injection**:
-    *   Uploads CSV to `Developer Inputs/Thailand/`.
-    *   `core.compliance` lazy-reloads this on next request.
-
-### 4.4. Jobs V2 Module (`/Server Backend/jobs_v2`)
-*   **Role:** The "Workforce". Connecting skilled labor with crisis needs.
-*   **Tech Stack:** Django (Strict Views), MongoDB (`jobs_users`, `jobs_posts`, `jobs_applications`).
-*   **Key Logic:**
-    *   **Application Lifecycle**: `applied` -> `pending` (Chat Unlock) -> `accepted` (Contractual) -> `completed`.
-    *   **Messaging Gate**: Chat is STRICTLY disabled until status is `pending` or `accepted`.
-    *   **Notification Settings**: Customizable toggles for "Pending" vs "Non-Pending" alerts.
+1. **No raw news feeds** - All news must pass through Atlas G3 gates
+2. **No Drift Guard/Compliance Gate bypass** - Exclusion zones must always be enforced
+3. **No auto-certify DEFCON 1-2** - High-severity must have human verification
+4. **Schemas outrank implementations** - Data contracts are sacred
+5. **Rules over heuristics** - Label uncertainty, never escalate
 
 ---
 
-## 5. Infrastructure & Deployment (`/Infrastructure`)
+## 6. Key File Locations
 
-*   **Docker Compose (`docker-compose.prod.yml`)**:
-    *   `web`: Django Gunicorn (Port 8000).
-    *   `nginx`: Reverse Proxy (Port 80 -> 8000).
-*   **Networking**:
-    *   Nginx Config (`nginx.conf`) enables **Gzip Compression** (Level 6) to mitigate packet fragmentation on high-latency mobile networks.
-*   **Data Volume**:
-    *   `/data/db`: MongoDB persistence loop.
+### Backend Core
+| File | Purpose |
+|------|---------|
+| `core/views.py` | Main API endpoints, AI orchestration |
+| `core/urls.py` | URL routing configuration |
+| `core/settings.py` | Django settings |
+| `core/atlas_schema.py` | Atlas pipeline schema definitions |
+| `core/compliance.py` | Exclusion zone enforcement |
+| `core/geo_utils.py` | Geospatial calculations |
+| `portal_views.py` | Admin console views |
+
+### Frontend Core
+| File | Purpose |
+|------|---------|
+| `lib/main.dart` | App entry, state management |
+| `lib/jobs_module.dart` | Jobs V2 integration |
+| `lib/jobs_v2/api.dart` | Jobs API client |
+| `lib/jobs_v2/screens/*.dart` | UI screens |
+
+---
+
+## 7. Environment Variables
+
+| Variable | Description | Location |
+|----------|-------------|----------|
+| `GEMINI_API_KEY` | Google AI API key | `api_config.py` or env |
+| `MONGODB_URI` | MongoDB connection string | `settings.py` |
+| `DEBUG` | Django debug mode | `settings.py` |
+| `SECRET_KEY` | Django secret key | `settings.py` |
 
 ---
 
-## 6. How to Build New Modules
-To extend Sentinel, follow these integration rules:
+## 8. Deployment
 
-1.  **Frontend Extensions**:
-    *   Add new data fields to `IntelDetails.fromJson` in `main.dart`.
-    *   Add corresponding UI widget in `DashboardPage`.
-    *   **Constraint**: Must handle `null` values gracefully (Offline-First).
-2.  **Backend Extensions**:
-    *   Add logic to `conflict_agent.py`.
-    *   Update `analyst_system_prompt.txt` to instruct AI on new fields.
-    *   **Constraint**: NO new blocking calls. Use Threading for anything > 200ms.
-3.  **New Country Support**:
-    *   Add `CountryCode` folder in `Developer Inputs`.
-    *   Add `_Exclusary_Zones.csv`.
-    *   Update `COUNTRY_MAP` in `core/compliance.py`.
+### Docker Production
+```bash
+cd "Server Backend"
+docker-compose -f docker-compose.prod.yml up -d
+```
 
----
-*End of Ultra Master Descriptor. System State: Canonical.*
+### Local Development
+```bash
+# Backend
+cd "Server Backend"
+sh run_public.sh
 
-## 7. Contextual Preservation & Cost Analysis
+# Frontend
+cd "Android Frontend/Sentinel - Android"
+flutter run
 
-This document tracks the codebase size and estimated "rebuild cost" (Total Input Tokens required to ingest the full source code) for the Sentinel Project.
-
-### Metrics Log
-
-| Date       | Event / Milestone      | Lines of Code | Total Bytes | Est. Token Cost |
-|------------|------------------------|---------------|-------------|-----------------|
-| 2026-01-20 | Backend & Frontend Fixes (Jobs) | ~32,309       | ~523 KB     | ~131,000        |
-| 2026-01-22 | Regression Testing Suite Setup  | ~66,396       | ~11.8 MB    | ~2,950,000      |
-
-### Calculation Method
-- **Lines of Code**: `find . ... | xargs wc -l` (excluding node_modules, build, etc.)
-- **Total Bytes**: `find . ... | xargs wc -c`
-- **Token Cost**: Approx `Total Bytes / 4`.
-
-### Deployment Rules for Agents
-When performing a large deployment or significant refactor:
-1. Run line count and byte count analysis.
-2. Update this log with the new snapshot.
-3. Update `README.md` with the latest totals.
-
-## 8. CONTEXT WINDOW COPY (SYSTEM KNOWLEDGE)
-*Injected from Context_Window_Copy.txt*
-
-### 8.1. PROJECT IDENTITY
-- **Project Name**: Sentinel [CONFIRMED]
-- **Internal Codenames**:
-    - SDT-IS (Sentinel Defense Technologies Information System) [CONFIRMED]
-    - Intelligence Node (Server Backend) [CONFIRMED]
-    - Tactical Interface (Android Frontend) [CONFIRMED]
-    - Command Controller (Admin Console) [CONFIRMED]
-    - The Watchman (Android logic name) [CONFIRMED]
-    - The Conflict Agent (Backend script name) [CONFIRMED]
-- **Purpose Primary**: To mitigate civilian risk in high-kinetic conflict zones by providing real-time, AI-verified intelligence, predictive forecasting, and evacuation logistics. [CONFIRMED]
-- **Purpose Secondary**: Provide a "Ground Truth" for humanitary corridors. [INFERRED]
-- **Problem Solved**: High-latency, unverified, or fragmented intelligence for civilians during active conflict. [CONFIRMED]
-- **Threat/Failure Model**:
-    - **Threat**: Misinformation/Drift leading to dangerous routing. [CONFIRMED]
-    - **Threat**: System-gated alerts (DEFCON 1-2) causing delay in human-verified panic response. [ASSUMED]
-    - **Failure**: Server downtime leading to "stale" intel (handled by 72h grey-out logic). [CONFIRMED]
-
-### 8.2. DESIGN PHILOSOPHY & PRINCIPLES
-- **Core Principles**:
-    - **Safety over Speed**: High-severity alerts require human verification (HITL). [CONFIRMED]
-    - **Privacy First (PDPA)**: Ephemeral ID rotation every 24 hours. [CONFIRMED]
-    - **Offline-First**: Mobile app must handle null/no-internet states gracefully. [CONFIRMED]
-    - **Sovereignty**: Control of data within restricted zones (Exclusion zones). [CONFIRMED]
-
-### 8.3. BEHAVIORAL CONSTRAINTS & RULES
-- **Hard Rules**:
-    - Never generate intel for points inside Exclusion Zones.
-    - Never display DEFCON 1-2 as "CONFIRMED" without human approval.
-    - Rotate User ID every 24 hours.
-- **Soft Rules**:
-    - Optimize for mobile network latency (Gzip compression Level 6).
-    - Use 5-second timeouts for VPS pings.
-- **Override Conditions**: Admin Portal can manually set `is_certified = True`.
-- **Uncertainty behavior**: System marks as "UNCONFIRMED" and adds "System Warnings" to the summary array.
-
-### 8.4. META-INFORMATION (CRITICAL)
-- **Designer Focus**: Reliability and correctness of the "Human-In-The-Loop" gate.
-- **Success Definition**: Zero civilians entering known hazard zones due to system misinformation.
-- **Under-documented but Critical**: The interplay between `Djongo`, `sqlparse`, and `Django 4.1.13` versions (specific pins are required for Mac Silicon build stability).
+# Website
+cd Website
+npm run dev
+```
 
 ---
 
 ## 9. System Governance Rules
-**CRITICAL RULE**: This document (`MASTER_DESCRIPTION.md`) is the **Single Source of Truth (SSOT)** for the Sentinel System. It supersedes all other documentation, including the now-deprecated `Context_Window_Copy.txt`. All architectural changes, core identity updates, and metric tracking must be committed directly to this file.
+
+**CRITICAL RULE**: This document (`MASTER_DESCRIPTION.md`) is the **Single Source of Truth (SSOT)** for the Sentinel System. All architectural changes, core identity updates, and metric tracking must be committed directly to this file.
 
 **NAMING STANDARDS**: Strict adherence to [Naming_Conventions.md](Naming_Conventions.md) is required for all new code, database schemas, and API definitions.
+
+**MERGE PROTOCOL**: See [MERGE_PROTOCOL_AND_GOVERNANCE.md](MERGE_PROTOCOL_AND_GOVERNANCE.md) for branch management rules.
+
+---
+
+## 10. Version History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-01-31 | 1.0.34 | Repository push to GitHub, documentation overhaul |
+| 2026-01-30 | 1.0.33 | Atlas G3 + Jobs V2 + Admin Console merge |
+| 2026-01-27 | 1.0.32 | Worker Application Lifecycle & Messaging enhancements |
+| 2026-01-22 | 1.0.31 | Regression testing suite, naming conventions |
+| 2026-01-21 | 1.0.30 | Jobs V2 employer verification, employer flow |
+| 2026-01-08 | 1.0.0 | Golden Master release |
+
+---
+
+*End of Ultra Master Descriptor. System State: Canonical.*

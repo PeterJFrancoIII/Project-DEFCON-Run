@@ -1,81 +1,221 @@
 # MERGE PROTOCOL & GOVERNANCE: SENTINEL PROJECT
 
-**Status**: ACTIVE
-**Effective Date**: 2026-01-30
-**Event**: Post-Mortem of "Atlas G3 + Jobs V2 + Admin" Merge.
+**Status**: ACTIVE  
+**Effective Date**: 2026-01-31  
+**Repository**: [GitHub - Project-DEFCON-Run](https://github.com/PeterJFrancoIII/Project-DEFCON-Run)
 
 ---
 
 ## 1. Core Governance Directive
-**Priority Rule**: "Peter's Rules Take Precedence."
+
+### Priority Rule: "Peter's Rules Take Precedence"
 
 When conflicts arise between branches or documentation:
-1.  **Primary Authority**: `Sentinel - Development` (Main Branch).
-    *   Source of Truth: `MASTER_DESCRIPTION.md`.
-    *   Security Constraints: `03-ai-usage-constraints.md`.
-    *   System Identity: `01-system-identity.md`.
-2.  **Secondary Context**: Fork-specific documentation (e.g., Conor's `AI_AGENT_READ_THIS.rtf`) applies *only* to the specific module being merged and *only* if it does not violate Primary Authority.
 
-### 1.1. Unified Rulebook (Merged Context)
-*   **System Identity**: Sentinel is a civilian-protection intelligence system. Safety > Speed. (From Peter).
-*   **Tech Stack**: Python/Django/MongoDB/Flutter. (Shared).
-*   **Agent Constraint**: AI must not auto-certify DEFCON 1-2. (From Peter).
-*   **Module Constraint**: Deviations from the stack "should be avoided unless strictly necessary". (From Conor).
+| Priority | Source | Authority |
+|----------|--------|-----------|
+| 1 (Highest) | `Sentinel - Development` (Main Branch) | Single Source of Truth |
+| 2 | `MASTER_DESCRIPTION.md` | System architecture |
+| 3 | `03-ai-usage-constraints.md` | Security constraints |
+| 4 | `01-system-identity.md` | System identity |
+| 5 (Lowest) | Fork-specific docs | Module-scoped only |
+
+### 1.1. Unified Rulebook
+
+| Rule | Source | Description |
+|------|--------|-------------|
+| Safety > Speed | Peter | Human-in-the-loop for DEFCON 1-2 |
+| Tech Stack | Shared | Python/Django/MongoDB/Flutter only |
+| No Auto-Certify | Peter | AI cannot approve high-severity alerts |
+| Stack Deviations | Conor | "Avoided unless strictly necessary" |
 
 ---
 
-## 2. Issues Encountered (The "Why" of this Protocol)
-During the Jan 30, 2026 Merge, the following critical failure modes were identified. Agents must check for these patterns in all future operations.
+## 2. Lessons Learned (Post-Mortem: 2026-01-30 Merge)
 
 ### 2.1. The "Silent Loss" of Admin Tools
-*   **Incident**: The Admin Console (`portal_views.py` and `templates/admin`) existed in `Main` but was missing from the Target Fork (`Conor`).
-*   **Failure**: A standard merge/copy operation assumed the Target Fork was a complete superset of `Main`. It was not.
-*   **Result**: The Admin Console was initially deleted/lost in the merge.
-*   **Lesson**: **Never assume a Fork contains the "Base" system.** Always treat `Main` as the inventory of record.
+
+| Aspect | Details |
+|--------|---------|
+| **Incident** | Admin Console (`portal_views.py`, templates) existed in Main but missing from Target Fork |
+| **Failure** | Assumed Target Fork was complete superset of Main |
+| **Result** | Admin Console initially deleted/lost |
+| **Lesson** | **Never assume a Fork contains the Base system. Treat Main as inventory of record.** |
 
 ### 2.2. The "Hybrid View" Conflict
-*   **Incident**: Both branches modified `core/views.py`.
-    *   Main: Contained `admin_verify_threat` (Critical for Safety).
-    *   Conor: Contained `run_atlas_pipeline` (Critical for Intelligence).
-*   **Failure**: A file-level overwrite would have destroyed one of these critical functions.
-*   **Lesson**: **File-level merging is dangerous for core controllers.** Use line-level patching or "Base + Patch" appending strategies.
+
+| Aspect | Details |
+|--------|---------|
+| **Incident** | Both branches modified `core/views.py` |
+| **Main** | Contained `admin_verify_threat` (Critical for Safety) |
+| **Fork** | Contained `run_atlas_pipeline` (Critical for Intelligence) |
+| **Lesson** | **File-level merging is dangerous. Use line-level patching.** |
 
 ### 2.3. The Workspace Constraint
-*   **Incident**: Cloning to a fresh directory (`Sentinel - Merged`) outside the Agent's allowed workspace prevented automated verification.
-*   **Lesson**: All merge targets must be within the Agent's authorized file tree, or the User must manually verify the final launch.
+
+| Aspect | Details |
+|--------|---------|
+| **Incident** | Cloning outside Agent's allowed workspace prevented verification |
+| **Lesson** | **All merge targets must be within authorized file tree.** |
 
 ---
 
-## 3. The New Merge Protocol (Standard Operating Procedure)
-
-For all future merges involving `Sentinel`, the following checklist is **MANDATORY**.
+## 3. Standard Operating Procedure (SOP)
 
 ### Phase 1: Inventory & Protection
-- [ ] **Lock Main**: Treat the `Sentinel - Development` directory as Read-Only until the final swap.
-- [ ] **Identify "Golden Assets"**: List files that MUST NOT be lost (e.g., `jobs_v2`, `admin_verify_threat`).
-- [ ] **Dependency Audit**: Does the incoming code rely on new files (e.g., `atlas_schema.py`)? Add them to the copy list.
 
-### Phase 2: safe_merge.sh Strategy
-Do not rely on `git merge` for radical divergences. Use a "Constructive Merge" script:
-1.  **Create Clean Target**: `mkdir Sentinel - Merged`.
-2.  **Copy Main First**: `cp -r Main/* Target/`. (Ensures all Admin/Legacy tools are present).
-3.  **Inject Features**: `cp -r Feature/* Target/`. (Overwrites *only* specific modules).
-4.  **Patch Hybrids**:
-    *   If a file exists in both, DO NOT OVERWRITE.
-    *   Append the *new* functions to the *old* file (or vice versa, whichever is cleaner).
-    *   *Example*: `cat admin_patch.py >> new_views.py`.
+```
+□ Lock Main: Treat `Sentinel - Development` as Read-Only until final swap
+□ Identify Golden Assets: List critical files (jobs_v2, admin_verify_threat, etc.)
+□ Dependency Audit: Check for new files the incoming code needs
+□ Create Backup: Copy current Main to timestamped archive
+```
+
+### Phase 2: Constructive Merge Strategy
+
+Do **NOT** rely on `git merge` for radical divergences. Use this script pattern:
+
+```bash
+#!/bin/bash
+# safe_merge.sh
+
+# 1. Create clean target
+mkdir -p "Sentinel - Merged"
+
+# 2. Copy Main first (preserves Admin/Legacy tools)
+cp -r "Sentinel - Development"/* "Sentinel - Merged/"
+
+# 3. Inject features (overwrites specific modules only)
+cp -r "Feature-Fork/new_module"/* "Sentinel - Merged/new_module/"
+
+# 4. Patch hybrids (append, don't overwrite)
+# For conflicting files like views.py:
+cat "Feature-Fork/core/new_functions.py" >> "Sentinel - Merged/core/views.py"
+```
 
 ### Phase 3: Verification Gates
-Before notifying the user:
-- [ ] **grep "Golden Function"**: Ensure critical safety logic (e.g., `admin_verify_threat`) exists.
-- [ ] **grep "New Feature"**: Ensure new logic (e.g., `run_atlas_pipeline`) exists.
-- [ ] **ls "Missing Assets"**: Check for files that might have been "left behind" (e.g., `portal_views.py`).
+
+Before notifying user, run these checks:
+
+```bash
+# Verify Golden Functions exist
+grep -r "admin_verify_threat" "Sentinel - Merged/Server Backend/" || echo "MISSING: admin_verify_threat"
+grep -r "run_atlas_pipeline" "Sentinel - Merged/Server Backend/" || echo "MISSING: run_atlas_pipeline"
+
+# Verify critical files
+ls "Sentinel - Merged/Server Backend/portal_views.py" || echo "MISSING: portal_views.py"
+ls "Sentinel - Merged/Server Backend/core/gates/" || echo "MISSING: gates directory"
+
+# Verify Jobs V2 module
+ls "Sentinel - Merged/Server Backend/jobs_v2/views/" || echo "MISSING: jobs_v2 views"
+```
+
+### Phase 4: Post-Merge Validation
+
+```bash
+# Start backend and verify
+cd "Sentinel - Merged/Server Backend"
+sh run_public.sh &
+
+# Test critical endpoints
+curl http://localhost:8000/intel/status
+curl http://localhost:8000/admin_portal/
+curl http://localhost:8000/api/jobs/auth/status
+```
 
 ---
 
-## 4. Updates to MASTER_DESCRIPTION
-*   **Added**: `Jobs V2` Module (Employer Verification, Worker Applications).
-*   **Added**: `Atlas G3` Pipeline (Multi-Agent News Verification).
-*   **Added**: `Admin Console` (Recovery confirmed).
+## 4. Git Workflow
 
-*This document is now attached to the Project Memory.*
+### Branch Structure
+```
+main (protected)
+├── feature/atlas-g3
+├── feature/jobs-v2-messaging
+├── fix/gate1-duplicate-key
+└── release/v1.0.34
+```
+
+### Commit Message Format
+```
+[MODULE] Action: Description
+
+Examples:
+[Jobs V2] Add: Employer verification workflow
+[Atlas G3] Fix: DuplicateKeyError in Gate 1
+[Admin] Update: 2FA token validation
+[Docs] Update: MASTER_DESCRIPTION.md
+```
+
+### Pull Request Checklist
+```
+□ All tests pass (`flutter test`, `python test_jobs_v2.py`)
+□ No linting errors
+□ Documentation updated if API changes
+□ Golden Assets verified (grep checks)
+□ MASTER_DESCRIPTION.md version bumped
+```
+
+---
+
+## 5. Emergency Rollback Procedure
+
+If a merge causes critical failure:
+
+```bash
+# 1. Stop all services
+pkill -f "python manage.py"
+pkill -f "flutter"
+
+# 2. Restore from backup
+rm -rf "Sentinel - Development"
+cp -r "Sentinel - Development.backup.YYYYMMDD" "Sentinel - Development"
+
+# 3. Restart services
+cd "Sentinel - Development/Server Backend"
+sh run_public.sh
+
+# 4. Document incident in Prompt_History.md
+```
+
+---
+
+## 6. Module Inventory (Golden Assets)
+
+These files/directories must **NEVER** be deleted during a merge:
+
+### Critical Backend
+| Path | Purpose |
+|------|---------|
+| `Server Backend/portal_views.py` | Admin Console views |
+| `Server Backend/core/views.py` | Main API + `admin_verify_threat` |
+| `Server Backend/core/gates/` | Atlas G3 pipeline |
+| `Server Backend/jobs_v2/` | Employment module |
+| `Server Backend/core/compliance.py` | Exclusion zone enforcement |
+
+### Critical Frontend
+| Path | Purpose |
+|------|---------|
+| `Android Frontend/Sentinel - Android/lib/main.dart` | App entry |
+| `Android Frontend/Sentinel - Android/lib/jobs_v2/` | Jobs UI |
+
+### Critical Documentation
+| Path | Purpose |
+|------|---------|
+| `MASTER_DESCRIPTION.md` | System authority |
+| `Naming_Conventions.md` | Code standards |
+
+---
+
+## 7. Related Documentation
+
+- [MASTER_DESCRIPTION.md](MASTER_DESCRIPTION.md) - System architecture
+- [Prompt_History.md](Prompt_History.md) - Change log
+- [Naming_Conventions.md](Naming_Conventions.md) - Code standards
+- [REGRESSION_TESTING_README.md](REGRESSION_TESTING_README.md) - Test protocols
+
+---
+
+*This document is part of Project Memory and must be consulted before any merge operation.*
+
+*Last Updated: 2026-01-31*
