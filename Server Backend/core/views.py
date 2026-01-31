@@ -63,6 +63,17 @@ STALE_THRESHOLD_SECONDS = 14400
 # --- CONCURRENCY CONTROL ---
 MISSION_QUEUE = {} 
 
+# --- LOADING PROGRESS MAPPING ---
+PROGRESS_MAP = {
+    "Idle": 0,
+    "Connecting": 10,
+    "Atlas G3: Ingesting": 25,
+    "Atlas G3: Verifying": 40,
+    "Analyst Running": 60,
+    "Translator Running": 85,
+    "Done": 100
+}
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 # --- MODEL INITIALIZATION ---
@@ -206,16 +217,57 @@ def run_atlas_pipeline():
     return "\n".join(formatted_headlines), clean_packets
 
 # --- SERVER OBSERVABILITY (DB BACKED) ---
-def update_status(stage):
+def update_status(stage, zip_code=None):
     try:
         db = get_db_handle()
+        progress = PROGRESS_MAP.get(stage, 0)
+        doc = {
+            "current_stage": stage, 
+            "progress_percent": progress,
+            "last_updated": time.time()
+        }
+        if zip_code:
+            doc["zip_code"] = zip_code
         db.system_status.replace_one(
             {"_id": "global_status"}, 
-            {"current_stage": stage, "last_updated": time.time()}, 
+            doc, 
             upsert=True
         )
     except Exception as e:
         print(f"[!] Status Update Error: {e}")
+
+def record_analysis_timing(elapsed_ms):
+    """Record analysis timing for statistics (keep last 100)."""
+    try:
+        db = get_db_handle()
+        db.analysis_timing.insert_one({
+            "elapsed_ms": elapsed_ms,
+            "timestamp": time.time()
+        })
+        # Prune to last 100
+        count = db.analysis_timing.count_documents({})
+        if count > 100:
+            oldest = db.analysis_timing.find().sort("timestamp", 1).limit(count - 100)
+            db.analysis_timing.delete_many({"_id": {"$in": [d["_id"] for d in oldest]}})
+    except Exception as e:
+        print(f"[!] Timing Record Error: {e}")
+
+def get_timing_stats():
+    """Get min/max/avg timing from last 100 requests."""
+    try:
+        db = get_db_handle()
+        docs = list(db.analysis_timing.find().sort("timestamp", -1).limit(100))
+        if not docs:
+            return None
+        times = [d["elapsed_ms"] for d in docs]
+        return {
+            "min_ms": min(times),
+            "max_ms": max(times),
+            "avg_ms": int(sum(times) / len(times)),
+            "sample_count": len(times)
+        }
+    except:
+        return None
 
 def intel_status(request):
     """Polled by frontend during loading to show progress."""
@@ -224,22 +276,33 @@ def intel_status(request):
         status_doc = db.system_status.find_one({"_id": "global_status"})
         
         current_stage = "Idle"
+        progress_percent = 0
+        
         if status_doc:
             if time.time() - status_doc.get("last_updated", 0) < 60:
                 current_stage = status_doc.get("current_stage", "Idle")
+                progress_percent = status_doc.get("progress_percent", 0)
             else:
                  # Auto-reset if stale
                  db.system_status.update_one(
                      {"_id": "global_status"}, 
-                     {"$set": {"current_stage": "Idle"}}
+                     {"$set": {"current_stage": "Idle", "progress_percent": 0}}
                  )
+        
+        # Get timing stats
+        timing_stats = get_timing_stats()
                  
-        return JsonResponse({
+        response = {
             'status': 'success', 
-            'stage': current_stage
-        })
+            'stage': current_stage,
+            'progress_percent': progress_percent
+        }
+        if timing_stats:
+            response['timing_stats'] = timing_stats
+            
+        return JsonResponse(response)
     except:
-        return JsonResponse({'status': 'success', 'stage': 'Idle'})
+        return JsonResponse({'status': 'success', 'stage': 'Idle', 'progress_percent': 0})
 
 
 # --- WORKER: TRANSLATION ---
@@ -263,6 +326,7 @@ def run_translation_logic(zip_code, target_lang, master_data):
 
 # --- WORKER: FULL ANALYSIS ---
 def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='unknown'):
+    start_time = time.time()
     print(f'>> [ANALYST] Generating VERIFIED THREAT REPORT for {zip_code}...')
     update_status("Connecting")
     
@@ -465,6 +529,10 @@ def run_mission_logic(zip_code, country, geo_data, target_lang='en', device_id='
         print(f'>> [ANALYST] Critical Error: {e}')
         traceback.print_exc() 
     finally:
+        # Record timing for stats
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        record_analysis_timing(elapsed_ms)
+        print(f'>> [TIMING] Analysis completed in {elapsed_ms}ms')
         if zip_code in MISSION_QUEUE:
             del MISSION_QUEUE[zip_code]
 
@@ -487,29 +555,23 @@ def intel_api(request):
         db = get_db_handle()
         col = db.intel_history
         
-        # GRID SEARCH
+        # EXACT ZIP LOOKUP (No Grouping)
         user_lon = geo_dict['lon']
         user_lat = geo_dict['lat']
         
-        nearby_doc = col.find_one({
-            "location_geo": {
-                "$near": {
-                    "$geometry": { "type": "Point", "coordinates": [user_lon, user_lat] },
-                    "$maxDistance": GRID_RADIUS_METERS
-                }
-            }
-        })
+        # Query by exact zip code - each zip gets its own analysis
+        cached_doc = col.find_one({"zip_code": zip_code})
 
         serve_cached = False
         final_doc = None
 
-        if nearby_doc:
-            ts_str = nearby_doc.get('timestamp')
+        if cached_doc:
+            ts_str = cached_doc.get('timestamp')
             if ts_str:
                 last_dt = datetime.datetime.fromisoformat(ts_str)
                 age = (datetime.datetime.now() - last_dt).total_seconds()
                 if age < STALE_THRESHOLD_SECONDS:
-                    final_doc = nearby_doc
+                    final_doc = cached_doc
                     serve_cached = True
 
         if not serve_cached:

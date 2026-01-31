@@ -646,6 +646,11 @@ class SentinelProvider with ChangeNotifier {
       "https://www.paypal.com/donate?hosted_button_id=SKTF4DM7JLV26";
   String websiteUrl = "https://sentinelcivilianriskanalysis.netlify.app";
   String loadingStage = "Initializing...";
+  int loadingPercent = 0;
+  int? timingMin;
+  int? timingMax;
+  int? timingAvg;
+  int? timingSampleCount;
 
   SentinelProvider() {
     _loadInitData();
@@ -734,6 +739,16 @@ class SentinelProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         loadingStage = data['stage'] ?? "Processing...";
+        loadingPercent = data['progress_percent'] ?? 0;
+
+        // Parse timing stats if available
+        if (data['timing_stats'] != null) {
+          final stats = data['timing_stats'];
+          timingMin = stats['min_ms'];
+          timingMax = stats['max_ms'];
+          timingAvg = stats['avg_ms'];
+          timingSampleCount = stats['sample_count'];
+        }
         notifyListeners();
       }
     } catch (_) {}
@@ -1419,8 +1434,34 @@ class _LogViewerDialogState extends State<LogViewerDialog> {
   }
 }
 
-class LoadingPage extends StatelessWidget {
+class LoadingPage extends StatefulWidget {
   const LoadingPage({super.key});
+
+  @override
+  State<LoadingPage> createState() => _LoadingPageState();
+}
+
+class _LoadingPageState extends State<LoadingPage> {
+  late DateTime _startTime;
+  int _elapsedSeconds = 0;
+  late final _timer = Stream.periodic(const Duration(seconds: 1), (x) => x);
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer.listen((_) {
+      if (mounted) {
+        setState(() {
+          _elapsedSeconds = DateTime.now().difference(_startTime).inSeconds;
+        });
+      }
+    });
+  }
 
   void _showLogs(BuildContext context) {
     showDialog(
@@ -1429,31 +1470,136 @@ class LoadingPage extends StatelessWidget {
         builder: (ctx) => const LogViewerDialog());
   }
 
+  String _formatTime(int? ms) {
+    if (ms == null) return "--";
+    if (ms < 1000) return "${ms}ms";
+    return "${(ms / 1000).toStringAsFixed(1)}s";
+  }
+
+  String _formatElapsed(int seconds) {
+    if (seconds < 60) return "${seconds}s";
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    return "${mins}m ${secs}s";
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = Provider.of<SentinelProvider>(context);
+    final isLoading = vm.connectionStatus.contains("GATHERING") ||
+        vm.connectionStatus == "ESTABLISHING UPLINK...";
+
     return Scaffold(
         body: Stack(children: [
       Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        const CircularProgressIndicator(color: Colors.red),
-        const SizedBox(height: 20),
-        Text(vm.connectionStatus,
-            style:
-                const TextStyle(color: Colors.yellow, fontFamily: 'Courier')),
-        if (vm.connectionStatus.contains("GATHERING") ||
-            vm.connectionStatus == "ESTABLISHING UPLINK...")
-          Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text("STATUS: ${vm.loadingStage}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 10))),
-        const SizedBox(height: 40),
-        TextButton(
-            onPressed: () => vm.resetSystem(),
-            child: const Text("ABORT",
-                style:
-                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))
-      ])),
+          child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          // Progress Ring with Percentage
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    value: isLoading && vm.loadingPercent > 0
+                        ? vm.loadingPercent / 100
+                        : null,
+                    color: Colors.red,
+                    backgroundColor: Colors.grey[800],
+                    strokeWidth: 8,
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoading && vm.loadingPercent > 0)
+                      Text(
+                        "${vm.loadingPercent}%",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier',
+                        ),
+                      ),
+                    // Elapsed Timer
+                    Text(
+                      _formatElapsed(_elapsedSeconds),
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontFamily: 'Courier',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(vm.connectionStatus,
+              style:
+                  const TextStyle(color: Colors.yellow, fontFamily: 'Courier')),
+          if (isLoading) ...[
+            Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text("STATUS: ${vm.loadingStage}",
+                    style: const TextStyle(color: Colors.grey, fontSize: 12))),
+            // Timing Stats with Elapsed comparison
+            if (vm.timingAvg != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[700]!),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      "ESTIMATED (${vm.timingSampleCount ?? 0} samples)",
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 10,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildTimingStat(
+                            "MIN", _formatTime(vm.timingMin), Colors.green),
+                        const SizedBox(width: 12),
+                        _buildTimingStat(
+                            "AVG", _formatTime(vm.timingAvg), Colors.yellow),
+                        const SizedBox(width: 12),
+                        _buildTimingStat(
+                            "MAX", _formatTime(vm.timingMax), Colors.red),
+                        const SizedBox(width: 12),
+                        _buildTimingStat("NOW", _formatElapsed(_elapsedSeconds),
+                            Colors.cyan),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+          const SizedBox(height: 40),
+          TextButton(
+              onPressed: () => vm.resetSystem(),
+              child: const Text("ABORT",
+                  style: TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.bold)))
+        ]),
+      )),
       Positioned(
           top: 40,
           right: 20,
@@ -1462,6 +1608,21 @@ class LoadingPage extends StatelessWidget {
               tooltip: "Live Server Logs",
               onPressed: () => _showLogs(context)))
     ]));
+  }
+
+  Widget _buildTimingStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Courier')),
+      ],
+    );
   }
 }
 
@@ -2799,4 +2960,3 @@ class DefconListScreen extends StatelessWidget {
         ]));
   }
 }
-
