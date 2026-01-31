@@ -6,6 +6,7 @@
 *.key
 key.properties
 google-services.json
+api_config.py
 
 # Environment files
 .env

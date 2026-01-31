@@ -1,6 +1,6 @@
-# SENSITIVE CONFIGURATION - DO NOT COMMIT REAL KEYS
-# Copy this file and add your keys locally
-# Updated: 2026-01-31
+# API Configuration Template
+# Copy this file to api_config.py and add your real keys
+# DO NOT commit api_config.py with real keys
 
 # GATES
 GATE_1_KEY = "YOUR_GATE_1_KEY_HERE"

@@ -25,7 +25,7 @@ class GeminiAnalyst:
         """
         # Fetch Key Dynamically
         # Default to the one provided in chat if DB empty
-        DEFAULT_KEY = "AIzaSyB1MmBbioaghNYtwoesXZw7yoVfoZ0hpV4"
+        DEFAULT_KEY = os.environ.get('JOBS_ANALYST_KEY', 'YOUR_JOBS_ANALYST_KEY_HERE')
         api_key = JobsDAO.get_config("jobs_analyst_api_key", DEFAULT_KEY)
         
         prompt = f"""
