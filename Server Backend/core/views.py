@@ -126,10 +126,75 @@ def get_msg_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
 # --- ATLAS G3 PIPELINE ---
+def load_osint_sources():
+    """Load OSINT sources from CSV with validity scores."""
+    sources = []
+    if not os.path.exists(OSINT_SOURCE_FILE):
+        print("[ATLAS] No OSINT Sources.csv found, using fallback")
+        return [{"Source": "Google News", "URL": "https://news.google.com/rss/search?q=%QUERY%", 
+                 "ValidityScore": 75, "Active": "true", "APIType": "RSS"}]
+    try:
+        with open(OSINT_SOURCE_FILE, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Skip comments (lines starting with #)
+                if row.get('Source', '').startswith('#'):
+                    continue
+                if row.get('Active', 'true').lower() == 'true':
+                    sources.append({
+                        "Source": row.get('Source', 'Unknown'),
+                        "URL": row.get('URL', ''),
+                        "ValidityScore": int(row.get('ValidityScore', 75)),
+                        "APIType": row.get('APIType', 'RSS'),
+                        "Type": row.get('Type', 'RSS')
+                    })
+        print(f">> [ATLAS] Loaded {len(sources)} OSINT sources")
+    except Exception as e:
+        print(f"[ATLAS] CSV Load Error: {e}")
+    return sources
+
+def fetch_from_source(source, query):
+    """Fetch news from a single OSINT source."""
+    entries = []
+    url = source['URL'].replace('%QUERY%', query.replace(' ', '+'))
+    url = url.replace('%DATE%', datetime.datetime.now().strftime('%Y-%m-%d'))
+    
+    try:
+        if source['APIType'] == 'GDELT':
+            # GDELT JSON API
+            resp = http.client.HTTPSConnection("api.gdeltproject.org", timeout=10)
+            resp.request("GET", url.replace('https://api.gdeltproject.org', ''))
+            result = resp.getresponse()
+            if result.status == 200:
+                data = json.loads(result.read().decode())
+                for article in data.get('articles', [])[:15]:
+                    entries.append({
+                        'title': article.get('title', ''),
+                        'link': article.get('url', ''),
+                        'source': source['Source'],
+                        'validity_score': source['ValidityScore'],
+                        'published': article.get('seendate', '')
+                    })
+        else:
+            # RSS Feed (default)
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:10]:  # Cap per source
+                entries.append({
+                    'title': entry.get('title', ''),
+                    'link': entry.get('link', ''),
+                    'source': source['Source'],
+                    'validity_score': source['ValidityScore'],
+                    'published': entry.get('published', '')
+                })
+    except Exception as e:
+        print(f"   [!] Source {source['Source']} failed: {e}")
+    
+    return entries
+
 def run_atlas_pipeline():
     """
     ATLAS G3 ORCHESTRATOR
-    Replaces legacy fetch_news() with a Multi-Agent Pipeline.
+    Multi-source OSINT ingestion with developer-configurable validity scores.
     """
     update_status("Atlas G3: Ingesting")
     
@@ -140,35 +205,43 @@ def run_atlas_pipeline():
     
     clean_packets = []
     formatted_headlines = []
+    all_entries = []
     
     try:
         if hasattr(ssl, '_create_unverified_context'):
             ssl._create_default_https_context = ssl._create_unverified_context
         
-        # 1. INGEST (RSS Source) - Same query as before
+        # 1. LOAD OSINT SOURCES FROM CSV
+        sources = load_osint_sources()
         query = "Thailand Cambodia border shelling OR artillery OR mortar OR drone attack OR firefight OR explosion OR clash"
-        url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-US&gl=US&ceid=US:en"
         
-        feed = feedparser.parse(url)
+        # 2. FETCH FROM ALL ACTIVE SOURCES
+        print(f">> [ATLAS] Querying {len(sources)} sources...")
+        for source in sources:
+            entries = fetch_from_source(source, query)
+            all_entries.extend(entries)
+            if entries:
+                print(f"   + {source['Source']}: {len(entries)} items (score: {source['ValidityScore']})")
         
-        if not feed.entries:
+        if not all_entries:
             return "No recent reports.", []
 
-        # 2. PIPELINE EXECUTION
-        print(f">> [ATLAS] Processing {len(feed.entries)} items...")
+        # 3. PIPELINE EXECUTION
+        print(f">> [ATLAS] Processing {len(all_entries)} total items...")
         
-        for entry in feed.entries[:30]: # Cap at 30 for speed
+        for entry in all_entries[:50]:  # Cap at 50 for speed
             
             # GATE 1: INGEST & DEDUP
             packet = gate1.process_packet(
                 raw_input=entry,
-                source_id="google_news_rss",
-                source_tier=SourceTier.TRUSTED_MEDIA, # Google News Aggregation
-                ingest_method=IngestMethod.RSS
+                source_id=entry.get('source', 'unknown'),
+                source_tier=SourceTier.TRUSTED_MEDIA,
+                ingest_method=IngestMethod.RSS,
+                source_validity=entry.get('validity_score', 75)  # Pass validity from CSV
             )
             
             if not packet:
-                continue # Dropped by Gate 1 (Duplicate)
+                continue  # Dropped by Gate 1 (Duplicate)
                 
             # GATE 2: BASE (CLASSIFY)
             packet = gate2_base.process_packet(packet)
@@ -181,7 +254,6 @@ def run_atlas_pipeline():
             # FINAL COLLECTION
             if packet.triage.processing_status == ProcessingStatus.CLEAN:
                 clean_packets.append(packet)
-                # Format for Analyst Prompt
                 formatted_headlines.append(
                     f"[ID: {packet.identity.artifact_id[:8]}] {packet.payload.title} "
                     f"(Score: {packet.triage.validity_score}, Domain: {packet.triage.risk_domain.value})"
@@ -908,3 +980,182 @@ def admin_verify_threat(request):
         return JsonResponse({'status': 'error', 'message': 'Not Found'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+# ==============================================================================
+# DATABASE DASHBOARD API (Developer Tools)
+# ==============================================================================
+
+def db_list_collections(request):
+    """List all MongoDB collections with document counts."""
+    try:
+        db = get_db_handle()
+        collections = []
+        for name in db.list_collection_names():
+            try:
+                count = db[name].count_documents({})
+                collections.append({"name": name, "count": count})
+            except:
+                collections.append({"name": name, "count": "?"})
+        
+        # Sort by name
+        collections.sort(key=lambda x: x['name'])
+        
+        response = JsonResponse({
+            'status': 'success',
+            'database': db.name,
+            'collections': collections
+        })
+        # Add CORS headers for file:// protocol access
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        return response
+    except Exception as e:
+        response = JsonResponse({'status': 'error', 'message': str(e)})
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+
+def db_get_collection_data(request, collection_name):
+    """Get documents from a specific collection with filtering and search."""
+    try:
+        db = get_db_handle()
+        
+        if collection_name not in db.list_collection_names():
+            response = JsonResponse({'status': 'error', 'message': 'Collection not found'})
+            response['Access-Control-Allow-Origin'] = '*'
+            return response
+        
+        limit = int(request.GET.get('limit', 100))
+        skip = int(request.GET.get('skip', 0))
+        query_text = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('status', '').strip()
+        source_filter = request.GET.get('source', '').strip()
+        
+        col = db[collection_name]
+        
+        # Build query
+        mongo_query = {}
+        
+        if status_filter:
+            # Check various status fields
+            mongo_query['$or'] = [
+                {'processing_status': status_filter},
+                {'triage.processing_status': status_filter},
+                {'status': status_filter}
+            ]
+            
+        if source_filter:
+            mongo_query['$or'] = [
+                {'source_id': source_filter},
+                {'source.source_id': source_filter}
+            ]
+            
+        if query_text:
+            # Basic text search on common fields
+            regex = {'$regex': query_text, '$options': 'i'}
+            text_query = [
+                {'title': regex},
+                {'payload.title': regex},
+                {'summary': regex},
+                {'zip_code': regex}
+            ]
+            if '$or' in mongo_query:
+                mongo_query['$and'] = [
+                    {'$or': mongo_query.pop('$or')},
+                    {'$or': text_query}
+                ]
+            else:
+                mongo_query['$or'] = text_query
+        
+        total = col.count_documents(mongo_query)
+        
+        # Get documents, converting ObjectId to string
+        docs = []
+        for doc in col.find(mongo_query).skip(skip).limit(limit).sort('_id', -1):
+            # Convert ObjectId and other non-serializable types
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+            # Handle datetime objects
+            for key, val in list(doc.items()):
+                if hasattr(val, 'isoformat'):
+                    doc[key] = val.isoformat()
+                elif isinstance(val, dict):
+                    for k2, v2 in list(val.items()):
+                        if hasattr(v2, 'isoformat'):
+                            val[k2] = v2.isoformat()
+            docs.append(doc)
+        
+        response = JsonResponse({
+            'status': 'success',
+            'collection': collection_name,
+            'count': total,
+            'documents': docs,
+            'limit': limit,
+            'skip': skip,
+            'filters': {'q': query_text, 'status': status_filter, 'source': source_filter}
+        })
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        return response
+    except Exception as e:
+        response = JsonResponse({'status': 'error', 'message': str(e)})
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+
+def db_get_stats(request):
+    """Get aggregation stats for dashboard charts."""
+    try:
+        db = get_db_handle()
+        stats = {}
+        
+        # 1. Pipeline Stage Counts
+        stages = {
+            'gate1': 'raw_news_index',
+            'gate2': 'atlas_packets',
+            'analyst': 'clean_news',
+            'output': 'intel_history'
+        }
+        
+        stage_counts = {}
+        for key, col_name in stages.items():
+            if col_name in db.list_collection_names():
+                stage_counts[key] = db[col_name].count_documents({})
+            else:
+                stage_counts[key] = 0
+        stats['stages'] = stage_counts
+        
+        # 2. Source Distribution (Top 20 from raw news)
+        if 'raw_news_index' in db.list_collection_names():
+            pipeline = [
+                {'$group': {'_id': '$source', 'count': {'$sum': 1}}},
+                {'$sort': {'count': -1}},
+                {'$limit': 20}
+            ]
+            try:
+                source_counts = list(db.raw_news_index.aggregate(pipeline))
+                stats['sources'] = [{'name': s['_id'] or 'Unknown', 'count': s['count']} for s in source_counts]
+            except:
+                stats['sources'] = []
+        
+        # 3. Status Distribution (from Atlas Packets)
+        if 'atlas_packets' in db.list_collection_names():
+            pipeline = [
+                {'$group': {'_id': '$triage.processing_status', 'count': {'$sum': 1}}}
+            ]
+            try:
+                status_counts = list(db.atlas_packets.aggregate(pipeline))
+                stats['statuses'] = [{'status': s['_id'] or 'Unknown', 'count': s['count']} for s in status_counts]
+            except:
+                stats['statuses'] = []
+                
+        response = JsonResponse({'status': 'success', 'stats': stats})
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        response = JsonResponse({'status': 'error', 'message': str(e)})
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+
+

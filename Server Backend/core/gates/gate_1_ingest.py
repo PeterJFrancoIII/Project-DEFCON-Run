@@ -49,7 +49,8 @@ class Gate1Ingest:
         raw_input: Any, 
         source_id: str, 
         source_tier: SourceTier,
-        ingest_method: IngestMethod
+        ingest_method: IngestMethod,
+        source_validity: int = 75  # Developer-configured validity score from CSV
     ) -> Optional[AtlasPacket]:
         """
         Ingests a single raw item, filters via AI, checks duplications, 
@@ -61,6 +62,7 @@ class Gate1Ingest:
         url = raw_input.get("link", "") or raw_input.get("url", "")
         summary = raw_input.get("summary", "") or raw_input.get("description", "")
         published_at = raw_input.get("published_parsed", None)
+        source_name = raw_input.get("source", source_id)  # Track source name
         
         if published_at:
             # Convert struct_time to float if needed
@@ -95,7 +97,7 @@ class Gate1Ingest:
                 source_published_at=published_at
             ),
             source=SourceContext(
-                source_id=source_id,
+                source_id=source_name,  # Use source name from CSV
                 source_tier=source_tier,
                 ingest_method=ingest_method
             ),
@@ -105,12 +107,14 @@ class Gate1Ingest:
                 language_code=relevance_result.get("language", "en")
             ),
             triage=TriageMetadata(
-                processing_status=ProcessingStatus.RAW
+                processing_status=ProcessingStatus.RAW,
+                validity_score=source_validity  # Initialize with developer-configured score
             )
         )
         
-        # Add AI-extracted metadata
+        # Add AI-extracted metadata + source validity
         packet.triage.add_history("GATE1_PASS")
+        packet.triage.add_history(f"GATE1_SOURCE_VALIDITY:{source_validity}")
         packet.triage.add_history(f"GATE1_SENTIMENT:{relevance_result.get('sentiment', 'NEUTRAL')}")
         packet.triage.add_history(f"GATE1_KEYWORDS:{','.join(relevance_result.get('keywords', [])[:3])}")
         

@@ -61,6 +61,11 @@ urlpatterns = [
 
     # --- DEBUG: ATLAS G3 (From Conor) ---
     path('api/debug/pipeline', views.debug_pipeline, name='debug_pipeline'),
+    
+    # --- DATABASE DASHBOARD (Developer Tools) ---
+    path('admin/db/collections', views.db_list_collections, name='db_list_collections'),
+    path('admin/db/collection/<str:collection_name>', views.db_get_collection_data, name='db_get_collection_data'),
+    path('admin/db/stats', views.db_get_stats, name='db_get_stats'),
 ]
 
 # Serve media files in development

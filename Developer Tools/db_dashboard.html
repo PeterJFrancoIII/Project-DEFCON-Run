@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel Database Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 15px 20px;
+            border-bottom: 2px solid #ff0040;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #ff0040;
+            font-size: 22px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tab {
+            background: #222;
+            border: 1px solid #444;
+            color: #aaa;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+        }
+
+        .tab.active {
+            background: #ff0040;
+            color: #fff;
+            border-color: #ff0040;
+        }
+
+        .container {
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 240px;
+            background: #111;
+            border-right: 1px solid #333;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: #ff0040;
+            margin-bottom: 12px;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .main {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 100px;
+        }
+
+        .stat-box .value {
+            font-size: 28px;
+            color: #ff0040;
+            font-weight: bold;
+        }
+
+        .stat-box .label {
+            font-size: 9px;
+            color: #666;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-box.live .value {
+            color: #00ff00;
+        }
+
+        /* Pipeline Flow */
+        .pipeline-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #111;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .flow-node {
+            text-align: center;
+            min-width: 90px;
+        }
+
+        .flow-node .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin: 0 auto 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .flow-node .icon:hover {
+            transform: scale(1.1);
+        }
+
+        .flow-node.active .icon {
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        .flow-node.gate1 .icon {
+            background: linear-gradient(135deg, #ff6600, #cc5200);
+        }
+
+        .flow-node.gate2 .icon {
+            background: linear-gradient(135deg, #ffcc00, #cc9900);
+        }
+
+        .flow-node.gate2r .icon {
+            background: linear-gradient(135deg, #ff00ff, #cc00cc);
+        }
+
+        .flow-node.analyst .icon {
+            background: linear-gradient(135deg, #00ff00, #00cc00);
+        }
+
+        .flow-node.output .icon {
+            background: linear-gradient(135deg, #00ccff, #0099cc);
+        }
+
+        .flow-node .name {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .flow-node .count {
+            font-size: 14px;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .flow-arrow {
+            color: #333;
+            font-size: 24px;
+        }
+
+        /* Module buttons */
+        .module-btn {
+            width: 100%;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-left-width: 4px;
+            color: #888;
+            padding: 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            font-size: 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .module-btn:hover {
+            background: #222;
+            color: #fff;
+        }
+
+        .module-btn.active {
+            background: #222;
+            color: #fff;
+            border-color: #555;
+        }
+
+        .module-btn.gate1 {
+            border-left-color: #ff6600;
+        }
+
+        .module-btn.gate2 {
+            border-left-color: #ffcc00;
+        }
+
+        .module-btn.gate2r {
+            border-left-color: #ff00ff;
+        }
+
+        .module-btn.analyst {
+            border-left-color: #00ff00;
+        }
+
+        .module-btn.output {
+            border-left-color: #00ccff;
+        }
+
+        .module-btn.osint {
+            border-left-color: #ff0040;
+        }
+
+        .module-btn .count {
+            float: right;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+        }
+
+        /* Data display */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .data-table th {
+            background: #1a1a2e;
+            color: #ff0040;
+            padding: 10px;
+            text-align: left;
+            border-bottom: 2px solid #ff0040;
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #222;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-table tr:hover {
+            background: #1a1a1a;
+        }
+
+        .json-view {
+            background: #0d0d0d;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 500px;
+            overflow: auto;
+            font-size: 11px;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .error {
+            color: #ff4444;
+            background: #1a0a0a;
+            padding: 15px;
+            border: 1px solid #ff4444;
+            border-radius: 5px;
+        }
+
+        .search-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #00ff00;
+            padding: 8px 12px;
+            width: 250px;
+            font-family: inherit;
+            font-size: 11px;
+        }
+
+        .refresh-btn {
+            background: #ff0040;
+            border: none;
+            color: #fff;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+        }
+
+        .collection-btn {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #00ff00;
+            padding: 8px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            font-size: 10px;
+        }
+
+        .collection-btn:hover {
+            background: #222;
+            border-color: #ff0040;
+        }
+
+        .collection-btn.active {
+            background: #ff0040;
+            color: #fff;
+        }
+
+        .collection-btn .count {
+            float: right;
+            color: #666;
+            font-size: 9px;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 12px;
+        }
+
+        .card {
+            background: #111;
+            border: 1px solid #333;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            border-color: #ff0040;
+            transform: translateY(-2px);
+        }
+
+        .card .title {
+            color: #fff;
+            font-size: 12px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .card .meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .card .meta-item {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .card .meta-item span {
+            color: #ff0040;
+        }
+
+        .card.clean {
+            border-left: 3px solid #00ff00;
+        }
+
+        .card.pending {
+            border-left: 3px solid #ffcc00;
+        }
+
+        .card.dropped {
+            border-left: 3px solid #ff4444;
+        }
+
+        /* OSINT Sources */
+        .osint-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .osint-card {
+            background: #111;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .osint-card .name {
+            color: #fff;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        .osint-card .type {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .osint-card .score-bar {
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .osint-card .score-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .osint-card .score-text {
+            font-size: 11px;
+            color: #ff0040;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .osint-card.active {
+            border-color: #00ff00;
+        }
+
+        .osint-card.inactive {
+            opacity: 0.5;
+        }
+
+        /* Section header */
+        .section-header {
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            color: #ff0040;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .section-header p {
+            color: #666;
+            font-size: 11px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>⬡ SENTINEL DATABASE DASHBOARD</h1>
+        <div class="header-right">
+            <div class="live-indicator">
+                <div class="live-dot"></div>
+                <span id="last-updated">Connecting...</span>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="switchView('pipeline')">PIPELINE</button>
+                <button class="tab" onclick="switchView('osint')">OSINT</button>
+                <button class="tab" onclick="switchView('collections')">RAW</button>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="sidebar">
+            <div id="sidebar-content"></div>
+            <hr style="border-color: #222; margin: 15px 0;">
+            <h3>SERVER</h3>
+            <input type="text" id="server-url" class="search-box" style="width: 100%; margin-bottom: 8px;"
+                value="http://localhost:8000">
+            <button class="refresh-btn" onclick="init()" style="width: 100%;">CONNECT</button>
+            <div style="margin-top: 15px;">
+                <label style="font-size: 10px; color: #666; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()"> Auto-refresh (5s)
+                </label>
+            </div>
+        </div>
+        <div class="main">
+            <div class="stats-bar" id="stats-bar"></div>
+            <div class="pipeline-flow" id="pipeline-flow"></div>
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                <select id="status-filter" class="search-box" style="width: 150px;"
+                    onchange="loadPipelineStage(currentStage)">
+                    <option value="">All Statuses</option>
+                    <option value="CLEAN">Clean / Verified</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="DROPPED">Dropped</option>
+                    <option value="RAW">Raw</option>
+                    <option value="REINFORCED">Reinforced</option>
+                </select>
+                <input type="text" id="search" class="search-box" placeholder="Search documents..."
+                    oninput="loadPipelineStage(currentStage)">
+                <button class="refresh-btn" onclick="refreshCurrent()">↻ REFRESH</button>
+            </div>
+            <div id="content">
+                <div class="loading">Initializing...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ... (previous variables) ...
+        // Add osintStats variable
+        let osintStats = [];
+
+        // ... (switchView etc) ...
+
+        function updateOSINTStats(sourceStats) {
+            osintStats = sourceStats;
+            const sourceMap = {};
+            sourceStats.forEach(s => sourceMap[s.name] = s.count);
+
+            document.querySelectorAll('.osint-card').forEach(card => {
+                const nameDiv = card.querySelector('.name');
+                if (nameDiv) {
+                    const name = nameDiv.textContent;
+                    const count = sourceMap[name] || 0;
+
+                    // Add or update count badge
+                    let badge = card.querySelector('.osint-count');
+                    if (!badge) {
+                        badge = document.createElement('div');
+                        badge.className = 'osint-count';
+                        badge.style.cssText = 'font-size: 10px; color: #fff; background: #333; padding: 2px 6px; border-radius: 4px; float: right; margin-top: -20px;';
+                        card.insertBefore(badge, card.firstChild);
+                    }
+                    badge.textContent = `${count} ingested`;
+                    badge.style.color = count > 0 ? '#00ff00' : '#666';
+                }
+            });
+        }
+
+        // ... (rest of functions) ...
+
+        let currentView = 'pipeline';
+        let currentStage = 'gate1';
+        let currentCollection = null;
+        let allDocs = [];
+        let stageCounts = {};
+        let autoRefreshTimer = null;
+        const serverUrl = () => document.getElementById('server-url').value;
+
+        const STAGES = {
+            gate1: { name: 'raw_news_index', title: 'GATE 1', icon: '⚡', desc: 'Raw Ingest & Dedup' },
+            gate2: { name: 'atlas_packets', title: 'GATE 2', icon: '🔍', desc: 'Classification' },
+            gate2r: { name: 'atlas_packets', title: 'GATE 2R', icon: '🛡️', desc: 'Deep Verify', filter: 'reinforced' },
+            analyst: { name: 'clean_news', title: 'ANALYST', icon: '🧠', desc: 'Verified News' },
+            output: { name: 'intel_history', title: 'OUTPUT', icon: '📡', desc: 'Intel Reports' }
+        };
+
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderSidebar();
+            if (view === 'pipeline') loadPipelineStage(currentStage);
+            else if (view === 'osint') loadOSINT();
+            else loadCollections();
+        }
+
+        function renderSidebar() {
+            const sidebar = document.getElementById('sidebar-content');
+            if (currentView === 'pipeline') {
+                sidebar.innerHTML = `
+                    <h3>PIPELINE STAGES</h3>
+                    ${Object.entries(STAGES).map(([k, v]) => `
+                        <button class="module-btn ${k} ${currentStage === k ? 'active' : ''}" onclick="loadPipelineStage('${k}')">
+                            ${v.icon} ${v.title}<br><small style="color:#666;">${v.desc}</small>
+                            <span class="count">${stageCounts[k] || '-'}</span>
+                        </button>
+                    `).join('')}
+                `;
+            } else if (currentView === 'osint') {
+                sidebar.innerHTML = `<h3>OSINT SOURCES</h3><p style="color:#666;font-size:10px;">View configured news sources and their validity scores.</p>`;
+            } else {
+                sidebar.innerHTML = `<h3>COLLECTIONS</h3><div id="collections-list"><div class="loading">Loading...</div></div>`;
+                loadCollectionsList();
+            }
+        }
+
+        function renderPipelineFlow() {
+            document.getElementById('pipeline-flow').innerHTML = Object.entries(STAGES).map(([k, v], i) => `
+                ${i > 0 ? '<span class="flow-arrow">→</span>' : ''}
+                <div class="flow-node ${k} ${currentStage === k ? 'active' : ''}" onclick="loadPipelineStage('${k}')">
+                    <div class="icon">${v.icon}</div>
+                    <div class="count">${stageCounts[k] || 0}</div>
+                    <div class="name">${v.title}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderStats() {
+            const total = Object.values(stageCounts).reduce((a, b) => a + (b || 0), 0);
+            document.getElementById('stats-bar').innerHTML = `
+                <div class="stat-box"><div class="value">${stageCounts.gate1 || 0}</div><div class="label">Ingested</div></div>
+                <div class="stat-box"><div class="value">${stageCounts.analyst || 0}</div><div class="label">Verified</div></div>
+                <div class="stat-box"><div class="value">${stageCounts.output || 0}</div><div class="label">Reports</div></div>
+                <div class="stat-box live"><div class="value" id="live-stage">--</div><div class="label">Current Stage</div></div>
+            `;
+        }
+
+        async function fetchStageCounts() {
+            try {
+                // Fetch aggregation stats from new endpoint
+                const res = await fetch(`${serverUrl()}/admin/db/stats`);
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    // Update stage counts
+                    stageCounts = data.stats.stages || {};
+
+                    // Render source distribution chart if we're on OSINT view
+                    if (currentView === 'osint' && data.stats.sources) {
+                        updateOSINTStats(data.stats.sources);
+                    }
+
+                    document.getElementById('live-stage').textContent = data.stats.statuses?.[0]?.status || 'Active';
+                }
+            } catch (e) {
+                console.error("Stats fetch failed", e);
+            }
+            renderPipelineFlow();
+            renderStats();
+
+            // Also fetch live server status
+            fetchLiveStatus();
+        }
+
+        async function fetchLiveStatus() {
+            try {
+                const res = await fetch(`${serverUrl()}/intel/status`);
+                const data = await res.json();
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+            } catch { }
+        }
+
+        async function loadPipelineStage(stage) {
+            currentStage = stage;
+            renderSidebar();
+            renderPipelineFlow();
+
+            const stageInfo = STAGES[stage];
+            document.getElementById('content').innerHTML = `<div class="loading">Loading ${stageInfo.title}...</div>`;
+
+            // Get filters
+            const q = document.getElementById('search').value;
+            const status = document.getElementById('status-filter').value;
+
+            try {
+                const url = `${serverUrl()}/admin/db/collection/${stageInfo.name}?limit=100&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    allDocs = data.documents;
+                    renderPipelineCards(allDocs, stage);
+                }
+            } catch (e) {
+                document.getElementById('content').innerHTML = `
+                    <div class="section-header"><h2>${stageInfo.icon} ${stageInfo.title}</h2><p>${stageInfo.desc}</p></div>
+                    <div class="error">Collection "${stageInfo.name}" not found. Run the pipeline to populate.</div>
+                `;
+            }
+        }
+
+        function renderPipelineCards(docs, stage) {
+            const stageInfo = STAGES[stage];
+            let html = `<div class="section-header"><h2>${stageInfo.icon} ${stageInfo.title}: ${stageInfo.desc}</h2><p>${docs.length} documents</p></div>`;
+
+            if (!docs.length) {
+                html += '<p style="color:#666;">No documents. Run the pipeline to populate.</p>';
+                document.getElementById('content').innerHTML = html;
+                return;
+            }
+
+            html += '<div class="card-grid">';
+            docs.forEach((doc, i) => {
+                const title = doc.title || doc.payload?.title || doc.zip_code || doc._id || 'Untitled';
+                const status = doc.processing_status || doc.triage?.processing_status || doc.status || 'unknown';
+                const score = doc.validity_score ?? doc.triage?.validity_score ?? '-';
+                const source = doc.source_id || doc.source?.source_id || '-';
+
+                let cardClass = 'card';
+                if (status === 'CLEAN' || status === 'clean') cardClass += ' clean';
+                else if (status.includes('PENDING')) cardClass += ' pending';
+                else if (status.includes('DROP')) cardClass += ' dropped';
+
+                html += `
+                    <div class="${cardClass}" onclick="viewDoc(${i})">
+                        <div class="title">${String(title).substring(0, 100)}</div>
+                        <div class="meta">
+                            <div class="meta-item">Status: <span>${status}</span></div>
+                            <div class="meta-item">Score: <span>${score}</span></div>
+                            <div class="meta-item">Source: <span>${source}</span></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            document.getElementById('content').innerHTML = html;
+        }
+
+        async function loadOSINT() {
+            document.getElementById('content').innerHTML = '<div class="loading">Loading OSINT Sources...</div>';
+            document.getElementById('pipeline-flow').innerHTML = '';
+
+            const sources = [
+                // OSINT CORE - APIs
+                { name: 'GDELT Project', type: 'API', score: 98, cat: 'Core' },
+                { name: 'ACLED', type: 'API', score: 98, cat: 'Core' },
+                { name: 'LiveUAMap', type: 'Conflict', score: 92, cat: 'Core' },
+                { name: 'Crisis Group', type: 'Analysis', score: 94, cat: 'Core' },
+                { name: 'CFR Conflict Tracker', type: 'Analysis', score: 92, cat: 'Core' },
+                { name: 'SIPRI', type: 'Research', score: 93, cat: 'Core' },
+                // Military & Defense
+                { name: 'Janes Defence', type: 'Defense', score: 96, cat: 'Defense' },
+                { name: 'Defense One', type: 'Defense', score: 88, cat: 'Defense' },
+                { name: 'Breaking Defense', type: 'Defense', score: 87, cat: 'Defense' },
+                { name: 'Defense News', type: 'Defense', score: 87, cat: 'Defense' },
+                { name: 'War on the Rocks', type: 'Analysis', score: 89, cat: 'Defense' },
+                { name: 'The War Zone', type: 'Defense', score: 86, cat: 'Defense' },
+                // Investigative
+                { name: 'Bellingcat', type: 'OSINT', score: 93, cat: 'Investigative' },
+                { name: 'IntelBrief', type: 'Intel', score: 88, cat: 'Investigative' },
+                { name: 'ProPublica', type: 'Journalism', score: 91, cat: 'Investigative' },
+                { name: 'The Intercept', type: 'Journalism', score: 85, cat: 'Investigative' },
+                // Wire Services
+                { name: 'Associated Press', type: 'Wire', score: 97, cat: 'Wire' },
+                { name: 'Reuters', type: 'Wire', score: 97, cat: 'Wire' },
+                { name: 'AFP', type: 'Wire', score: 96, cat: 'Wire' },
+                // Broadcast
+                { name: 'BBC News', type: 'Broadcast', score: 92, cat: 'Broadcast' },
+                { name: 'NPR', type: 'Broadcast', score: 90, cat: 'Broadcast' },
+                { name: 'PBS NewsHour', type: 'Broadcast', score: 90, cat: 'Broadcast' },
+                { name: 'Al Jazeera', type: 'Broadcast', score: 88, cat: 'Broadcast' },
+                { name: 'DW News', type: 'Broadcast', score: 89, cat: 'Broadcast' },
+                { name: 'France 24', type: 'Broadcast', score: 87, cat: 'Broadcast' },
+                { name: 'NHK World', type: 'Broadcast', score: 86, cat: 'Broadcast' },
+                // Print / Digital
+                { name: 'New York Times', type: 'Print', score: 89, cat: 'Print' },
+                { name: 'Wall Street Journal', type: 'Print', score: 88, cat: 'Print' },
+                { name: 'Washington Post', type: 'Print', score: 88, cat: 'Print' },
+                { name: 'Financial Times', type: 'Print', score: 89, cat: 'Print' },
+                { name: 'The Economist', type: 'Print', score: 90, cat: 'Print' },
+                { name: 'The Guardian', type: 'Print', score: 87, cat: 'Print' },
+                { name: 'Foreign Affairs', type: 'Policy', score: 91, cat: 'Print' },
+                { name: 'Foreign Policy', type: 'Policy', score: 90, cat: 'Print' },
+                // Think Tanks
+                { name: 'RAND Corporation', type: 'Research', score: 90, cat: 'Think Tank' },
+                { name: 'Brookings', type: 'Research', score: 89, cat: 'Think Tank' },
+                { name: 'Carnegie Endowment', type: 'Research', score: 90, cat: 'Think Tank' },
+                { name: 'Atlantic Council', type: 'Research', score: 88, cat: 'Think Tank' },
+                { name: 'CSIS', type: 'Research', score: 89, cat: 'Think Tank' },
+                // Southeast Asia
+                { name: 'Bangkok Post', type: 'Regional', score: 82, cat: 'SE Asia' },
+                { name: 'The Nation Thailand', type: 'Regional', score: 80, cat: 'SE Asia' },
+                { name: 'Khmer Times', type: 'Regional', score: 78, cat: 'SE Asia' },
+                { name: 'Phnom Penh Post', type: 'Regional', score: 79, cat: 'SE Asia' },
+                { name: 'Channel News Asia', type: 'Regional', score: 85, cat: 'SE Asia' },
+                { name: 'SCMP', type: 'Regional', score: 84, cat: 'SE Asia' },
+                { name: 'The Diplomat', type: 'Regional', score: 86, cat: 'SE Asia' },
+                { name: 'Asia Times', type: 'Regional', score: 83, cat: 'SE Asia' },
+                // Middle East
+                { name: 'Middle East Eye', type: 'Regional', score: 82, cat: 'Middle East' },
+                { name: 'Al-Monitor', type: 'Regional', score: 84, cat: 'Middle East' },
+                // Europe
+                { name: 'Politico Europe', type: 'Regional', score: 87, cat: 'Europe' },
+                { name: 'EUobserver', type: 'Regional', score: 85, cat: 'Europe' },
+                // Africa
+                { name: 'Africa News', type: 'Regional', score: 80, cat: 'Africa' },
+                // Fallback
+                { name: 'Google News', type: 'Aggregator', score: 75, cat: 'Fallback' }
+            ];
+
+            let html = `<div class="section-header"><h2>📰 OSINT SOURCES</h2><p>${sources.length} configured sources (Edit in Developer Inputs/OSINT Sources.csv)</p></div>`;
+            html += '<div class="osint-grid">';
+
+            sources.forEach(s => {
+                const color = s.score >= 95 ? '#00ff00' : s.score >= 90 ? '#88ff00' : s.score >= 85 ? '#ffcc00' : s.score >= 80 ? '#ff8800' : '#ff4444';
+                html += `
+                    <div class="osint-card ${s.active ? 'active' : 'inactive'}">
+                        <div class="name">${s.name}</div>
+                        <div class="type">${s.type}</div>
+                        <div class="score-bar">
+                            <div class="score-fill" style="width: ${s.score}%; background: ${color};"></div>
+                        </div>
+                        <div class="score-text">
+                            <span>Validity Score</span>
+                            <span style="color: ${color}">${s.score}/100</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            document.getElementById('content').innerHTML = html;
+
+            // If we already have stats, update them
+            if (osintStats.length > 0) {
+                updateOSINTStats(osintStats);
+            }
+        }
+
+        async function loadCollectionsList() {
+            try {
+                const res = await fetch(`${serverUrl()}/admin/db/collections`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    document.getElementById('collections-list').innerHTML = data.collections.map(c => `
+                        <button class="collection-btn ${currentCollection === c.name ? 'active' : ''}" onclick="loadCollection('${c.name}')">
+                            ${c.name}<span class="count">${c.count}</span>
+                        </button>
+                    `).join('');
+                }
+            } catch (e) {
+                document.getElementById('collections-list').innerHTML = `<div class="error">${e.message}</div>`;
+            }
+        }
+
+        async function loadCollections() {
+            document.getElementById('pipeline-flow').innerHTML = '';
+            await loadCollectionsList();
+            if (currentCollection) loadCollection(currentCollection);
+            else document.getElementById('content').innerHTML = '<p style="color:#666;">Select a collection from the sidebar.</p>';
+        }
+
+        async function loadCollection(name) {
+            currentCollection = name;
+            loadCollectionsList();
+            document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(`${serverUrl()}/admin/db/collection/${name}?limit=100`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    allDocs = data.documents;
+                    renderTable(allDocs, name);
+                }
+            } catch (e) {
+                document.getElementById('content').innerHTML = `<div class="error">${e.message}</div>`;
+            }
+        }
+
+        function renderTable(docs, name) {
+            if (!docs.length) {
+                document.getElementById('content').innerHTML = `<div class="section-header"><h2>📁 ${name}</h2></div><p style="color:#666;">Empty collection.</p>`;
+                return;
+            }
+
+            const keys = [...new Set(docs.flatMap(d => Object.keys(d)))].slice(0, 7);
+            let html = `<div class="section-header"><h2>📁 ${name}</h2><p>${docs.length} documents</p></div>`;
+            html += `<table class="data-table"><thead><tr>${keys.map(k => `<th>${k}</th>`).join('')}<th>View</th></tr></thead><tbody>`;
+
+            docs.forEach((doc, i) => {
+                html += '<tr>';
+                keys.forEach(k => {
+                    let val = doc[k];
+                    if (typeof val === 'object') val = JSON.stringify(val).substring(0, 40) + '...';
+                    html += `<td>${String(val ?? '-').substring(0, 40)}</td>`;
+                });
+                html += `<td><button onclick="viewDoc(${i})" style="background:#333;border:1px solid #555;color:#0f0;padding:2px 8px;cursor:pointer;font-size:10px;">JSON</button></td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function viewDoc(i) {
+            const doc = allDocs[i];
+            document.getElementById('content').innerHTML = `
+                <button onclick="refreshCurrent()" style="background:#333;border:1px solid #555;color:#0f0;padding:5px 15px;cursor:pointer;margin-bottom:15px;">← Back</button>
+                <div class="json-view">${JSON.stringify(doc, null, 2)}</div>
+            `;
+        }
+
+        function filterDocs() {
+            const q = document.getElementById('search').value.toLowerCase();
+            const filtered = allDocs.filter(d => JSON.stringify(d).toLowerCase().includes(q));
+            if (currentView === 'pipeline') renderPipelineCards(filtered, currentStage);
+            else renderTable(filtered, currentCollection);
+        }
+
+        function refreshCurrent() {
+            if (currentView === 'pipeline') loadPipelineStage(currentStage);
+            else if (currentView === 'osint') loadOSINT();
+            else if (currentCollection) loadCollection(currentCollection);
+        }
+
+        function toggleAutoRefresh() {
+            if (document.getElementById('auto-refresh').checked) {
+                autoRefreshTimer = setInterval(() => {
+                    fetchStageCounts();
+                    fetchLiveStatus();
+                    if (currentView === 'pipeline') loadPipelineStage(currentStage);
+                }, 5000);
+            } else {
+                clearInterval(autoRefreshTimer);
+            }
+        }
+
+        async function init() {
+            renderSidebar();
+            await fetchStageCounts();
+            await fetchLiveStatus();
+            loadPipelineStage('gate1');
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

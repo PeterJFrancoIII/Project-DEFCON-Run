@@ -1,2 +1,71 @@
-Source,URL,Type
-Global Sentinel,https://sentinel-defense.com,Official
+Source,URL,Type,ValidityScore,Active,Notes,APIType
+# === OSINT CORE - DIRECT APIs ===
+GDELT Project,https://api.gdeltproject.org/api/v2/doc/doc?query=%QUERY%&mode=artlist&maxrecords=50&format=json,API,98,true,Global Database of Events - FREE API no key needed,GDELT
+ACLED,https://api.acleddata.com/acled/read?event_date=%DATE%&event_date_where=>&limit=100,API,98,true,Conflict event data - requires free API key,ACLED
+# === OSINT CORE - CONFLICT TRACKING ===
+LiveUAMap,https://news.google.com/rss/search?q=site:liveuamap.com+%QUERY%,RSS,92,true,Real-time conflict map alerts,RSS
+Crisis Group,https://news.google.com/rss/search?q=site:crisisgroup.org+%QUERY%,RSS,94,true,Conflict risk tracking,RSS
+CFR Conflict Tracker,https://news.google.com/rss/search?q=site:cfr.org+%QUERY%+conflict,RSS,92,true,Council on Foreign Relations,RSS
+Armed Conflict Location,https://news.google.com/rss/search?q=site:acleddata.com+%QUERY%,RSS,95,true,ACLED news articles,RSS
+SIPRI,https://news.google.com/rss/search?q=site:sipri.org+%QUERY%,RSS,93,true,Stockholm Peace Research Institute,RSS
+# === MILITARY & DEFENSE ===
+Janes Defence,https://news.google.com/rss/search?q=site:janes.com+%QUERY%,RSS,96,true,Defense intelligence OSINT,RSS
+Defense One,https://news.google.com/rss/search?q=site:defenseone.com+%QUERY%,RSS,88,true,US defense news,RSS
+Breaking Defense,https://news.google.com/rss/search?q=site:breakingdefense.com+%QUERY%,RSS,87,true,Defense industry news,RSS
+Defense News,https://news.google.com/rss/search?q=site:defensenews.com+%QUERY%,RSS,87,true,Military news,RSS
+War on the Rocks,https://news.google.com/rss/search?q=site:warontherocks.com+%QUERY%,RSS,89,true,Strategic analysis,RSS
+The War Zone,https://news.google.com/rss/search?q=site:thedrive.com/the-war-zone+%QUERY%,RSS,86,true,Military aviation and tech,RSS
+# === INVESTIGATIVE OSINT ===
+Bellingcat,https://news.google.com/rss/search?q=site:bellingcat.com+%QUERY%,RSS,93,true,Geolocation investigative reporting,RSS
+OSINT Foundation,https://news.google.com/rss/search?q=site:osintfoundation.com+%QUERY%,RSS,85,true,OSINT community,RSS
+IntelBrief,https://news.google.com/rss/search?q=site:thesoufancenter.org+%QUERY%,RSS,88,true,Soufan Center intelligence briefs,RSS
+# === WIRE SERVICES ===
+Associated Press,https://news.google.com/rss/search?q=site:apnews.com+%QUERY%,Wire,97,true,Global wire service,RSS
+Reuters,https://news.google.com/rss/search?q=site:reuters.com+%QUERY%,Wire,97,true,Premier global wire service,RSS
+AFP,https://news.google.com/rss/search?q=site:afp.com+%QUERY%,Wire,96,true,Agence France-Presse,RSS
+# === BROADCAST NEWS ===
+BBC News,https://news.google.com/rss/search?q=site:bbc.com+%QUERY%,Broadcast,92,true,BBC World Service,RSS
+NPR,https://news.google.com/rss/search?q=site:npr.org+%QUERY%,Broadcast,90,true,National Public Radio,RSS
+PBS NewsHour,https://news.google.com/rss/search?q=site:pbs.org+%QUERY%+newshour,Broadcast,90,true,Public Broadcasting Service,RSS
+Al Jazeera English,https://news.google.com/rss/search?q=site:aljazeera.com+%QUERY%,Broadcast,88,true,International news network,RSS
+DW News,https://news.google.com/rss/search?q=site:dw.com+%QUERY%,Broadcast,89,true,Deutsche Welle,RSS
+France 24,https://news.google.com/rss/search?q=site:france24.com+%QUERY%,Broadcast,87,true,French international,RSS
+NHK World,https://news.google.com/rss/search?q=site:nhk.or.jp+%QUERY%,Broadcast,86,true,Japan Broadcasting,RSS
+# === PRINT / DIGITAL ===
+New York Times,https://news.google.com/rss/search?q=site:nytimes.com+%QUERY%,Print,89,true,US newspaper of record,RSS
+Wall Street Journal,https://news.google.com/rss/search?q=site:wsj.com+%QUERY%,Print,88,true,Business and world news,RSS
+Washington Post,https://news.google.com/rss/search?q=site:washingtonpost.com+%QUERY%,Print,88,true,US political coverage,RSS
+Financial Times,https://news.google.com/rss/search?q=site:ft.com+%QUERY%,Print,89,true,Global business news,RSS
+The Economist,https://news.google.com/rss/search?q=site:economist.com+%QUERY%,Print,90,true,Global analysis weekly,RSS
+The Guardian,https://news.google.com/rss/search?q=site:theguardian.com+%QUERY%,Print,87,true,UK broadsheet,RSS
+Foreign Affairs,https://news.google.com/rss/search?q=site:foreignaffairs.com+%QUERY%,Print,91,true,International relations,RSS
+Foreign Policy,https://news.google.com/rss/search?q=site:foreignpolicy.com+%QUERY%,Print,90,true,Global affairs magazine,RSS
+# === INVESTIGATIVE JOURNALISM ===
+ProPublica,https://news.google.com/rss/search?q=site:propublica.org+%QUERY%,Investigation,91,true,Investigative journalism,RSS
+The Intercept,https://news.google.com/rss/search?q=site:theintercept.com+%QUERY%,Investigation,85,true,Security and surveillance,RSS
+# === THINK TANKS & RESEARCH ===
+RAND Corporation,https://news.google.com/rss/search?q=site:rand.org+%QUERY%,Research,90,true,Policy research,RSS
+Brookings Institution,https://news.google.com/rss/search?q=site:brookings.edu+%QUERY%,Research,89,true,Policy research,RSS
+Carnegie Endowment,https://news.google.com/rss/search?q=site:carnegieendowment.org+%QUERY%,Research,90,true,International peace,RSS
+Atlantic Council,https://news.google.com/rss/search?q=site:atlanticcouncil.org+%QUERY%,Research,88,true,Geopolitics research,RSS
+Center for Strategic Studies,https://news.google.com/rss/search?q=site:csis.org+%QUERY%,Research,89,true,CSIS analysis,RSS
+# === REGIONAL - SOUTHEAST ASIA ===
+Bangkok Post,https://news.google.com/rss/search?q=site:bangkokpost.com+%QUERY%,Regional,82,true,Thailand English daily,RSS
+The Nation Thailand,https://news.google.com/rss/search?q=site:nationthailand.com+%QUERY%,Regional,80,true,Thailand news,RSS
+Khmer Times,https://news.google.com/rss/search?q=site:khmertimeskh.com+%QUERY%,Regional,78,true,Cambodia English news,RSS
+Phnom Penh Post,https://news.google.com/rss/search?q=site:phnompenhpost.com+%QUERY%,Regional,79,true,Cambodia news,RSS
+VNExpress International,https://news.google.com/rss/search?q=site:e.vnexpress.net+%QUERY%,Regional,77,true,Vietnam English news,RSS
+Channel News Asia,https://news.google.com/rss/search?q=site:channelnewsasia.com+%QUERY%,Regional,85,true,Singapore news network,RSS
+South China Morning Post,https://news.google.com/rss/search?q=site:scmp.com+%QUERY%,Regional,84,true,Hong Kong / Asia coverage,RSS
+The Diplomat,https://news.google.com/rss/search?q=site:thediplomat.com+%QUERY%,Regional,86,true,Asia-Pacific analysis,RSS
+Asia Times,https://news.google.com/rss/search?q=site:asiatimes.com+%QUERY%,Regional,83,true,Asian affairs,RSS
+# === REGIONAL - MIDDLE EAST ===
+Middle East Eye,https://news.google.com/rss/search?q=site:middleeasteye.net+%QUERY%,Regional,82,true,Middle East coverage,RSS
+Al-Monitor,https://news.google.com/rss/search?q=site:al-monitor.com+%QUERY%,Regional,84,true,Middle East analysis,RSS
+# === REGIONAL - AFRICA ===
+Africa News,https://news.google.com/rss/search?q=site:africanews.com+%QUERY%,Regional,80,true,Pan-African news,RSS
+# === REGIONAL - EUROPE ===
+Politico Europe,https://news.google.com/rss/search?q=site:politico.eu+%QUERY%,Regional,87,true,European politics,RSS
+EUobserver,https://news.google.com/rss/search?q=site:euobserver.com+%QUERY%,Regional,85,true,EU news,RSS
+# === FALLBACK ===
+Google News,https://news.google.com/rss/search?q=%QUERY%,Aggregator,75,true,Catch-all fallback,RSS
