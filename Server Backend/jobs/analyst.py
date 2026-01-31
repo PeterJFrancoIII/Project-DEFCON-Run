@@ -14,7 +14,7 @@ class GeminiAnalyst:
     Uses Direct REST API to avoid global genai namespace conflicts.
     """
     
-    MODEL_NAME = 'gemini-2.5-flash-lite' 
+    MODEL_NAME = 'gemini-3-pro-preview'
     API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
     
     @classmethod
