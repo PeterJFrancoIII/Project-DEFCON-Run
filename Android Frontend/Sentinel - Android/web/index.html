@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="sentinel_android">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png" />
+
+  <title>sentinel_android</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<script>
+  window.addEventListener('error', function (event) {
+    var errorBox = document.getElementById('error-box');
+    if (!errorBox) {
+      errorBox = document.createElement('div');
+      errorBox.id = 'error-box';
+      errorBox.style.position = 'fixed';
+      errorBox.style.top = '0';
+      errorBox.style.left = '0';
+      errorBox.style.width = '100%';
+      errorBox.style.height = '100%';
+      errorBox.style.backgroundColor = 'darkred';
+      errorBox.style.color = 'white';
+      errorBox.style.zIndex = '9999';
+      errorBox.style.padding = '20px';
+      errorBox.style.fontFamily = 'monospace';
+      errorBox.style.whiteSpace = 'pre-wrap';
+      document.body.appendChild(errorBox);
+    }
+    errorBox.innerText += 'ERROR: ' + event.message + '\nAT: ' + event.filename + ':' + event.lineno + '\n\n';
+  });
+
+  window.addEventListener('unhandledrejection', function (event) {
+    var errorBox = document.getElementById('error-box');
+    if (!errorBox) {
+      errorBox = document.createElement('div');
+      errorBox.id = 'error-box';
+      errorBox.style.position = 'fixed';
+      errorBox.style.top = '0';
+      errorBox.style.left = '0';
+      errorBox.style.width = '100%';
+      errorBox.style.height = '100%';
+      errorBox.style.backgroundColor = 'darkred';
+      errorBox.style.color = 'white';
+      errorBox.style.zIndex = '9999';
+      errorBox.style.padding = '20px';
+      errorBox.style.fontFamily = 'monospace';
+      errorBox.style.whiteSpace = 'pre-wrap';
+      document.body.appendChild(errorBox);
+    }
+    errorBox.innerText += 'PROMISE REJECTION: ' + event.reason + '\n';
+  });
+</script>
+
+<script>
+  // FORCE CACHE CLEARING FOR DEV
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function (registrations) {
+      for (let registration of registrations) {
+        console.log('Unregistering SW:', registration);
+        registration.unregister();
+      }
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then(function (names) {
+      for (let name of names) {
+        console.log('Deleting cache:', name);
+        caches.delete(name);
+      }
+    });
+  }
+</script>
+<div id="loading-indicator" style="color: yellow; background: black; padding: 20px; font-family: monospace;">
+  SYSTEM BOOT... INITIALIZING FLUTTER ENGINE...
+</div>
+<script>
+  window.flutterWebRenderer = "html";
+</script>
+<script src="flutter_bootstrap.js?v=999" async></script>
+</body>
+
+</html>

@@ -1,0 +1,28 @@
+plugins = []
+headers = []
+redirects = []
+
+[functions]
+
+[functions."*"]
+
+[build]
+publish = "/Users/computer/Desktop/DEFCON_Run_Server_Staging/Website/dist"
+publishOrigin = "ui"
+commandOrigin = "ui"
+base = "/Users/computer/Desktop/DEFCON_Run_Server_Staging/Website"
+command = "npm run build"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]

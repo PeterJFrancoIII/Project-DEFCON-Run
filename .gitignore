@@ -1,0 +1,77 @@
+# Credentials and secrets
+*.json.json
+*credentials*.json
+*secret*.json
+*.pem
+*.key
+key.properties
+google-services.json
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+*.sqlite3
+
+# MongoDB data
+mongodb_data/
+*.wt
+*.turtle
+WiredTiger*
+journal/
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# Android
+*.apk
+*.aab
+*.jks
+.gradle/
+local.properties
+
+# iOS
+*.ipa
+Pods/
+.symlinks/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+*.egg-info/

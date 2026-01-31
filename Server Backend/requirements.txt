@@ -1,0 +1,16 @@
+Django==4.1.13
+gunicorn
+pymongo
+requests
+google-generativeai
+schedule
+feedparser
+flask
+django-otp
+qrcode
+shapely
+Pillow
+djangorestframework==3.14.0
+django-cors-headers==3.14.0
+sqlparse==0.2.4
+PyJWT==2.8.0

@@ -1,0 +1,2 @@
+json_key_file("./service_account.json") # Path to the json secret file - Follow instructions in README_FASTLANE to get one
+package_name("com.sentinel.defcon")
