@@ -19,6 +19,8 @@ dependencies:
   uuid: ^4.3.3
   geolocator: ^10.1.0
   in_app_purchase: ^3.2.0
+  image_picker: ^1.0.7
+  flutter_image_compress: ^2.1.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1

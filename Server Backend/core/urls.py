@@ -1,9 +1,15 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from . import views
 import portal_views as admin_views
 
 urlpatterns = [
+    # Jobs Module (Legacy - will be removed)
+    path('api/jobs/', include('jobs.urls')),
+    
+    # Jobs v2 Module (New clean rebuild)
+    path('api/jobs_v2/', include('jobs_v2.urls')),
+
     # The Visual Dashboard
     path('', views.home, name='home'),
     
@@ -18,6 +24,7 @@ urlpatterns = [
     
     # --- ADMIN PORTAL ---
     path('admin_portal', admin_views.admin_home, name='admin_home'),
+    path('admin/', admin_views.admin_home, name='admin_root'), # Fix for /admin/ 404
     path('admin/login', admin_views.admin_login, name='admin_login'),
     path('admin/logout', admin_views.admin_logout, name='admin_logout'),
     path('admin/setup-2fa', admin_views.setup_2fa, name='setup_2fa'),
@@ -51,3 +58,10 @@ urlpatterns = [
     path('api/admin/threats', admin_views.api_get_threats, name='api_get_threats'),
     path('admin/verify', views.admin_verify_threat, name='admin_verify_threat'), # MANUAL OVERRIDE
 ]
+
+# Serve media files in development
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

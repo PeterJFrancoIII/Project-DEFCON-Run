@@ -20,6 +20,8 @@ INSTALLED_APPS = [
     'core',
     'django_otp',
     'django_otp.plugins.otp_totp',
+    'jobs',
+    'jobs_v2',  # New clean Jobs module
 ]
 
 MIDDLEWARE = [
@@ -72,6 +74,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'mediafiles')
 
+
 CORS_ALLOW_ALL_ORIGINS = True
 CSRF_TRUSTED_ORIGINS = ['http://146.190.7.51', 'https://146.190.7.51', 'http://localhost:8000', 'http://127.0.0.1:8000']
+
+# MongoDB Configuration (Shared)
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
+MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'sentinel')
 

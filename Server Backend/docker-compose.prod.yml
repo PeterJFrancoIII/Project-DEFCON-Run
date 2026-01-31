@@ -28,6 +28,7 @@ services:
   nginx:
     build: ./nginx
     volumes:
+      - ./flutter_web:/home/app/web/flutter_web
       - static_volume:/home/app/web/staticfiles
       - media_volume:/home/app/web/mediafiles
     ports:

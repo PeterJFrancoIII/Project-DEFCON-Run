@@ -1,5 +1,3 @@
-import os
 
-# Gemini API Key Configuration
-# You can set this via environment variable or replace the string below.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBnMX93qsMm4zCyYPFTju2hjMWBCoAQe-I")
+# Valid as of Jan 16, 2026
+GEMINI_API_KEY = "AIzaSyC0pn_-8s13cXy7l4t5Ii-j5m7Gn0UQ5yQ"

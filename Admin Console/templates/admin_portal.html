@@ -110,6 +110,12 @@
                     <i class="bi bi-gear"></i> Assets & Config
                 </button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#jobs">
+                    <i class="bi bi-briefcase"></i> Jobs Management
+                </button>
+            </li>
+
         </ul>
 
         <div class="tab-content border border-top-0 p-3 card">
@@ -250,7 +256,184 @@
                 </div>
             </div>
 
+            <!-- 5. JOBS TAB -->
+            <div class="tab-pane fade" id="jobs">
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <h5 class="text-success"><i class="bi bi-briefcase-fill"></i> Jobs Ecosystem</h5>
+                        <!-- Analytics Cards -->
+                        <div class="row text-center mb-4" id="jobs-analytics">
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-jobs-total">0</h3><small class="text-muted">Total Jobs</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-jobs-active" class="text-success">0</h3><small
+                                        class="text-muted">Active</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-jobs-filled" class="text-info">0</h3><small
+                                        class="text-muted">Filled</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-users-total">0</h3><small class="text-muted">Users</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-employers">0</h3><small class="text-muted">Employers</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card p-2">
+                                    <h3 id="stat-workers">0</h3><small class="text-muted">Workers</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <ul class="nav nav-pills mb-3" id="jobs-subtabs" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="pill"
+                                    data-bs-target="#jobs-accounts-pane">Accounts</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="pill"
+                                    data-bs-target="#jobs-listings-pane">Listings</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#jobs-verification-pane">
+                                    <i class="bi bi-person-check-fill text-warning"></i> Verifications
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#jobs-moderation-pane">
+                                    <i class="bi bi-flag-fill text-danger"></i> Moderation
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- ACCOUNTS SUB-PANE -->
+                            <div class="tab-pane fade show active" id="jobs-accounts-pane">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Status</th>
+                                                <th>Trust</th>
+                                                <th>Strikes</th>
+                                                <th>Validity</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="jobs-accounts-table">
+                                            <tr>
+                                                <td colspan="7">Loading...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-outline-success btn-sm" onclick="loadJobsAccounts()">Refresh
+                                    Accounts</button>
+                            </div>
+
+                            <!-- LISTINGS SUB-PANE -->
+                            <div class="tab-pane fade" id="jobs-listings-pane">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Posted</th>
+                                                <th>Category</th>
+                                                <th>Employer</th>
+                                                <th>Pay</th>
+                                                <th>Status</th>
+                                                <th>Apps</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="jobs-listings-table">
+                                            <tr>
+                                                <td colspan="7">Loading...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-outline-success btn-sm" onclick="loadJobsListings()">Refresh
+                                    Listings</button>
+                            </div>
+
+                            <!-- VERIFICATIONS SUB-PANE -->
+                            <div class="tab-pane fade" id="jobs-verification-pane">
+                                <div class="alert alert-dark border border-warning">
+                                    <i class="bi bi-info-circle text-warning"></i> Employees requesting upgrade to
+                                    <strong>EMPLOYER</strong> status must be verified.
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Email</th>
+                                                <th>Name</th>
+                                                <th>Phone</th>
+                                                <th>Req. Time</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="jobs-verification-table">
+                                            <tr>
+                                                <td colspan="5">Loading...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-outline-warning btn-sm" onclick="loadPendingEmployers()">Refresh
+                                    Queue</button>
+                            </div>
+
+                            <!-- MODERATION SUB-PANE -->
+                            <div class="tab-pane fade" id="jobs-moderation-pane">
+                                <div class="alert alert-dark border border-danger">
+                                    <i class="bi bi-flag text-danger"></i> User-submitted reports requiring review.
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Reporter</th>
+                                                <th>Target</th>
+                                                <th>Type</th>
+                                                <th>Reason</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="jobs-moderation-table">
+                                            <tr>
+                                                <td colspan="6">Loading...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button class="btn btn-outline-danger btn-sm" onclick="loadModerationQueue()">Refresh
+                                    Reports</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+
+    </div>
     </div>
 
     <!-- Scripts -->
@@ -263,9 +446,8 @@
         function formatTime(iso) {
             if (!iso) return 'N/A';
             const d = new Date(iso);
-            // Format: 01/03/2026 19:43:41 UTC
             const pad = (n) => n.toString().padStart(2, '0');
-            return `${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+            return `${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}/${d.getUTCFullYear()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
         }
 
         function confirmSave() {
@@ -285,7 +467,18 @@
             loadPrompt();
             loadConfigAndContact();
             initThreatMap();
+            // Lazy load jobs tab when clicked, or just init here if light
+            const jobsTab = document.querySelector('button[data-bs-target="#jobs"]');
+            jobsTab.addEventListener('shown.bs.tab', initJobsTab);
         });
+
+        async function initJobsTab() {
+            loadJobsAnalytics();
+            loadJobsAccounts();
+            loadJobsListings();
+            loadPendingEmployers();
+        }
+
 
         function initMap() {
             map = L.map('map').setView([13.7563, 100.5018], 10);
@@ -441,9 +634,264 @@
             fd.append('logo', document.getElementById('logo-input').files[0]);
             await fetch('/api/admin/logo/upload', { method: 'POST', body: fd });
             alert('Logo Uploaded.');
+            alert('Logo Uploaded.');
+        }
+
+        // --- JOBS MANAGEMENT ---
+        async function loadJobsAnalytics() {
+            try {
+                // UPDATE: Use V2 Analytics
+                const res = await fetch('/api/jobs_v2/admin/analytics?secret=sentinel-admin-v2');
+                const data = await res.json();
+                if (data.analytics) {
+                    const stats = data.analytics;
+                    // Map V2 stats to UI
+                    document.getElementById('stat-jobs-total').innerText = stats.listings.total;
+                    document.getElementById('stat-jobs-active').innerText = stats.listings.active;
+                    document.getElementById('stat-jobs-filled').innerText = stats.listings.filled;
+
+                    document.getElementById('stat-users-total').innerText = stats.accounts.total;
+                    document.getElementById('stat-employers').innerText = stats.accounts.employers;
+                    document.getElementById('stat-workers').innerText = stats.accounts.workers;
+                }
+            } catch (e) { console.error("Analytics Error", e); }
+        }
+
+        async function loadJobsAccounts() {
+            try {
+                // Using shared secret for MVP auth bypass in this bespoke view
+                // UPDATE: Use V2 Accounts
+                const res = await fetch('/api/jobs_v2/admin/accounts?secret=sentinel-admin-v2');
+                if (!res.ok) throw new Error(`Server Error: ${res.status} ${res.statusText}`);
+                const data = await res.json();
+                const t = document.getElementById('jobs-accounts-table');
+
+                if (!data.accounts || !data.accounts.length) {
+                    t.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No accounts found.</td></tr>';
+                    return;
+                }
+
+                t.innerHTML = data.accounts.map(acc => {
+                    const validityColor = acc.validity_score > 80 ? 'text-success' : (acc.validity_score > 50 ? 'text-warning' : 'text-danger');
+                    const statusBadge = acc.status === 'banned' ? 'bg-danger' : (acc.status === 'suspended' ? 'bg-warning' : 'bg-success');
+
+                    return `
+                    <tr>
+                        <td>${acc.email}</td>
+                        <td>${acc.role}</td>
+                        <td><span class="badge ${statusBadge}">${acc.status}</span></td>
+                        <td>${acc.trust_score || 0}</td>
+                        <td>${acc.report_strikes || 0}</td>
+                        <td class="${validityColor} fw-bold">${acc.validity_score}%</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" onclick="jobsAction('${acc.account_id}', 'SUSPEND')">Suspend</button>
+                                <button class="btn btn-outline-danger" onclick="jobsAction('${acc.account_id}', 'BAN')">Ban</button>
+                                <button class="btn btn-outline-primary" onclick="jobsAction('${acc.account_id}', 'REINSTATE')">Reinstate</button>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Jobs Load Error", e);
+                document.getElementById('jobs-accounts-table').innerHTML = `<tr><td colspan="7" class="text-danger">Error loading data: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function jobsAction(id, action) {
+            if (!confirm(`Apply ${action} to this account?`)) return;
+
+            let duration = null;
+            if (action === 'SUSPEND') {
+                const d = prompt("Enter suspension duration in days:", "7");
+                if (!d) return;
+                duration = parseInt(d);
+            }
+
+            try {
+                // UPDATE: Use V2 Action
+                await fetch('/api/jobs_v2/admin/accounts/action?secret=sentinel-admin-v2', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        account_id: id,
+                        action: action,
+                        duration_days: duration
+                    })
+                });
+                loadJobsAccounts();
+            } catch (e) {
+                alert("Action failed: " + e);
+            }
+        }
+
+        async function loadJobsListings() {
+            try {
+                // UPDATE: Use V2
+                const res = await fetch('/api/jobs_v2/admin/listings?secret=sentinel-admin-v2');
+                if (!res.ok) throw new Error(`Server Error: ${res.status} ${res.statusText}`);
+                const data = await res.json();
+                const t = document.getElementById('jobs-listings-table');
+
+                if (!data.listings || !data.listings.length) {
+                    t.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No listings found.</td></tr>';
+                    return;
+                }
+
+                t.innerHTML = data.listings.map(job => {
+                    const statusColor = job.status === 'active' ? 'text-success' : (job.status === 'suspended' ? 'text-warning' : 'text-muted');
+                    const isSuspended = job.status === 'suspended';
+                    const isRemoved = job.status === 'removed';
+
+                    return `
+                    <tr>
+                        <td>${formatTime(job.created_at)}</td>
+                        <td class="fw-bold text-white">${job.category}</td>
+                        <td><small>${job.employer_id}</small></td>
+                        <td>${job.pay_type}</td>
+                        <td class="${statusColor}">${job.status.toUpperCase()}</td>
+                        <td>${job.applicant_count || 0}</td>
+                        <td>
+                             ${!isSuspended && !isRemoved ? `<button class="btn btn-sm btn-outline-warning" onclick="jobsListingAction('${job.job_id}', 'SUSPEND')">Suspend</button>` : ''}
+                             ${isSuspended ? `<button class="btn btn-sm btn-outline-success" onclick="jobsListingAction('${job.job_id}', 'REINSTATE')">Reinstate</button>` : ''}
+                             ${!isRemoved ? `<button class="btn btn-sm btn-outline-danger" onclick="jobsListingAction('${job.job_id}', 'DELETE')">Delete</button>` : ''}
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Listings Error", e);
+                t.innerHTML = '<tr><td colspan="7" class="text-danger">Error loading listings.</td></tr>';
+            }
+        }
+
+        async function jobsListingAction(id, action) {
+            if (!confirm(`${action} this listing?`)) return;
+            try {
+                await fetch('/api/jobs_v2/admin/listings/action?secret=sentinel-admin-v2', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_id: id,
+                        action: action
+                    })
+                });
+                loadJobsListings();
+                loadJobsAnalytics(); // Refresh stats
+            } catch (e) { alert("Failed: " + e); }
+        }
+
+        async function loadPendingEmployers() {
+            try {
+                const res = await fetch('/api/jobs_v2/admin/employers/pending?secret=sentinel-admin-v2');
+                const data = await res.json();
+                const t = document.getElementById('jobs-verification-table');
+
+                if (!data.employers || !data.employers.length) {
+                    t.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No pending verifications.</td></tr>';
+                    return;
+                }
+
+                t.innerHTML = data.employers.map(emp => `
+                <tr>
+                    <td>${emp.email}</td>
+                    <td class="fw-bold text-white">${emp.real_name_last}, ${emp.real_name_first}</td>
+                    <td>${emp.phone}</td>
+                    <td>${formatTime(emp.created_at)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="verifyEmployer('${emp.account_id}', 'approve')"><i class="bi bi-check-lg"></i> Approve</button>
+                        <button class="btn btn-sm btn-danger margin-left-2" onclick="verifyEmployer('${emp.account_id}', 'reject')"><i class="bi bi-x-lg"></i> Reject</button>
+                    </td>
+                </tr>
+                `).join('');
+            } catch (e) {
+                console.error("Verification Load Error", e);
+                document.getElementById('jobs-verification-table').innerHTML = '<tr><td colspan="5" class="text-danger">Error loading queue.</td></tr>';
+            }
+        }
+
+        async function verifyEmployer(id, action) {
+            if (!confirm(`Are you sure you want to ${action.toUpperCase()} this employer?`)) return;
+
+            try {
+                const res = await fetch('/api/jobs_v2/admin/employers/verify?secret=sentinel-admin-v2', {
+                    method: 'POST',
+                    body: JSON.stringify({ account_id: id, action: action })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    // alert(`Employer ${action}d successfully.`);
+                    loadPendingEmployers();
+                    loadJobsAccounts(); // Refresh accounts list too
+                } else {
+                    alert("Error: " + (data.error || "Unknown error"));
+                }
+            } catch (e) {
+                alert("Connection failed: " + e);
+            }
+        }
+
+        // --- MODERATION QUEUE ---
+        async function loadModerationQueue() {
+            try {
+                const res = await fetch('/api/jobs_v2/admin/reports', {
+                    headers: { 'X-Admin-Secret': 'HARDCODED_SECRET' }
+                });
+                const data = await res.json();
+
+                const tableBody = document.getElementById('jobs-moderation-table');
+                tableBody.innerHTML = '';
+
+                if (!data.reports || data.reports.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-muted">No pending reports.</td></tr>';
+                    return;
+                }
+
+                data.reports.forEach(r => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${formatTime(r.created_at)}</td>
+                            <td>${r.reporter_id || 'Unknown'}</td>
+                            <td>${r.target_id || 'N/A'}</td>
+                            <td><span class="badge bg-${r.target_type === 'user' ? 'info' : 'warning'}">${r.target_type || 'N/A'}</span></td>
+                            <td>${r.reason || 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-outline-danger btn-sm" onclick="moderationAction('${r.report_id}', 'action')">
+                                    <i class="bi bi-exclamation-triangle"></i> Action
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="moderationAction('${r.report_id}', 'dismiss')">
+                                    <i class="bi bi-x-circle"></i> Dismiss
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error('Moderation queue error:', e);
+                document.getElementById('jobs-moderation-table').innerHTML = '<tr><td colspan="6" class="text-danger">Failed to load reports.</td></tr>';
+            }
+        }
+
+        async function moderationAction(reportId, action) {
+            const confirmMsg = action === 'action'
+                ? 'Take action on this report? (suspends the target)'
+                : 'Dismiss this report?';
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                // For now, just log the action and refresh
+                // Full implementation would call a backend endpoint
+                alert(`Report ${reportId} ${action}ed. (Backend endpoint pending)`);
+                loadModerationQueue();
+            } catch (e) {
+                alert('Failed: ' + e);
+            }
         }
 
         // --- LIVE THREAT MAP ---
+
         async function initThreatMap() {
             // Delay slightly to ensure tab render
             const threatMap = L.map('threat-map').setView([13.5, 102.0], 8);

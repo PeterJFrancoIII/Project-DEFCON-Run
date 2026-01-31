@@ -5,10 +5,13 @@ INPUT VARIABLES:
 - TARGET_LOCATION: {target_name} (The civilian population center).
 - PROXIMITY_DATA: {dist_info} (Distance to known conflict borders/hotspots).
 - RAW_INTEL: {news_text} (Aggregated news reports and social chatter).
+- CURRENT_DATE: {current_date} (The Date of generated report).
 
 ---
 
 ### **1. THREAT EVALUATION MATRIX (STRICT RULES)**
+**CRITICAL DATE RULE**: You MUST use the CURRENT_DATE provided above for all "date" fields in your JSON output. Do NOT use old dates (e.g. 2023) unless the intelligence specifically refers to a past event. If an event is ongoing, use CURRENT_DATE.
+
 Do not rely solely on distance. You must evaluate the **NATURE** of the threat. Use the full spectrum (1-5).
 
 **DEFCON 1 (CRITICAL / KINETIC)**
@@ -60,7 +63,17 @@ Do not rely solely on distance. You must evaluate the **NATURE** of the threat. 
 
 ---
 
-### **4. JSON OUTPUT SCHEMA (STRICT)**
+### **4. CITATION & CONFIDENCE RULES**
+* **Citations**: You MUST link every claim in your SITREP to a source provided in RAW_INTEL.
+  - Format: {{ "source": "Source Name", "date": "YYYY-MM-DD" }}
+  - If no source is available, state "Analysis based on historical patterns" as source.
+* **Confidence Score**: Calculate based on:
+  - Number of independent sources confirming the event.
+  - Recency of the intelligence (< 24h = High Score).
+  - Explicit visual confirmation vs unverified social chatter.
+  - **Dynamic Probability**: Do NOT return static "95%". If situation is fluid, score should reflect uncertainty (e.g., 60-80%).
+
+### **5. JSON OUTPUT SCHEMA (STRICT)**
 Return ONLY valid JSON. No markdown formatting. No preamble.
 
 {{
@@ -100,39 +113,49 @@ Return ONLY valid JSON. No markdown formatting. No preamble.
     {{
       "id": "sitrep_1",
       "date": "YYYY-MM-DD",
-      "topic": "Political",
+      "type": "Political", // Enum: Political, Military, Civilian, Economic, Diplomatic
+      "topic": "Brief Header", 
       "summary": "Report on government/leadership/policy status.",
       "citations": [
          {{ "source": "Source Name", "date": "ISO Date", "url": "http://..." }}
-      ]
+      ],
+      "confidence_score": (1-100)
     }},
     {{
       "id": "sitrep_2",
       "date": "YYYY-MM-DD",
-      "topic": "Military",
+      "type": "Military",
+      "topic": "Brief Header",
       "summary": "Report on troop movements/kinetic events/borders.",
-      "citations": []
+      "citations": [],
+      "confidence_score": (1-100)
     }},
     {{
       "id": "sitrep_3",
       "date": "YYYY-MM-DD",
-      "topic": "Civilian",
+      "type": "Civilian",
+      "topic": "Brief Header",
       "summary": "Report on population safety/unrest/evacuations.",
-      "citations": []
+      "citations": [],
+      "confidence_score": (1-100)
     }},
     {{
       "id": "sitrep_4",
       "date": "YYYY-MM-DD",
-      "topic": "Economic",
+      "type": "Economic",
+      "topic": "Brief Header",
       "summary": "Report on markets/trade/infrastructure status.",
-      "citations": []
+      "citations": [],
+      "confidence_score": (1-100)
     }},
     {{
       "id": "sitrep_5",
       "date": "YYYY-MM-DD",
-      "topic": "Diplomatic",
+      "type": "Diplomatic",
+      "topic": "Brief Header",
       "summary": "Report on international relations/negotiations.",
-      "citations": []
+      "citations": [],
+      "confidence_score": (1-100)
     }}
   ],
   "forecast_entries": [

@@ -147,6 +147,14 @@ This is a `ChangeNotifier` state machine.
     *   Uploads CSV to `Developer Inputs/Thailand/`.
     *   `core.compliance` lazy-reloads this on next request.
 
+### 4.4. Jobs V2 Module (`/Server Backend/jobs_v2`)
+*   **Role:** The "Workforce". Connecting skilled labor with crisis needs.
+*   **Tech Stack:** Django (Strict Views), MongoDB (`jobs_users`, `jobs_posts`, `jobs_applications`).
+*   **Key Logic:**
+    *   **Application Lifecycle**: `applied` -> `pending` (Chat Unlock) -> `accepted` (Contractual) -> `completed`.
+    *   **Messaging Gate**: Chat is STRICTLY disabled until status is `pending` or `accepted`.
+    *   **Notification Settings**: Customizable toggles for "Pending" vs "Non-Pending" alerts.
+
 ---
 
 ## 5. Infrastructure & Deployment (`/Infrastructure`)
@@ -179,3 +187,75 @@ To extend Sentinel, follow these integration rules:
 
 ---
 *End of Ultra Master Descriptor. System State: Canonical.*
+
+## 7. Contextual Preservation & Cost Analysis
+
+This document tracks the codebase size and estimated "rebuild cost" (Total Input Tokens required to ingest the full source code) for the Sentinel Project.
+
+### Metrics Log
+
+| Date       | Event / Milestone      | Lines of Code | Total Bytes | Est. Token Cost |
+|------------|------------------------|---------------|-------------|-----------------|
+| 2026-01-20 | Backend & Frontend Fixes (Jobs) | ~32,309       | ~523 KB     | ~131,000        |
+| 2026-01-22 | Regression Testing Suite Setup  | ~66,396       | ~11.8 MB    | ~2,950,000      |
+
+### Calculation Method
+- **Lines of Code**: `find . ... | xargs wc -l` (excluding node_modules, build, etc.)
+- **Total Bytes**: `find . ... | xargs wc -c`
+- **Token Cost**: Approx `Total Bytes / 4`.
+
+### Deployment Rules for Agents
+When performing a large deployment or significant refactor:
+1. Run line count and byte count analysis.
+2. Update this log with the new snapshot.
+3. Update `README.md` with the latest totals.
+
+## 8. CONTEXT WINDOW COPY (SYSTEM KNOWLEDGE)
+*Injected from Context_Window_Copy.txt*
+
+### 8.1. PROJECT IDENTITY
+- **Project Name**: Sentinel [CONFIRMED]
+- **Internal Codenames**:
+    - SDT-IS (Sentinel Defense Technologies Information System) [CONFIRMED]
+    - Intelligence Node (Server Backend) [CONFIRMED]
+    - Tactical Interface (Android Frontend) [CONFIRMED]
+    - Command Controller (Admin Console) [CONFIRMED]
+    - The Watchman (Android logic name) [CONFIRMED]
+    - The Conflict Agent (Backend script name) [CONFIRMED]
+- **Purpose Primary**: To mitigate civilian risk in high-kinetic conflict zones by providing real-time, AI-verified intelligence, predictive forecasting, and evacuation logistics. [CONFIRMED]
+- **Purpose Secondary**: Provide a "Ground Truth" for humanitary corridors. [INFERRED]
+- **Problem Solved**: High-latency, unverified, or fragmented intelligence for civilians during active conflict. [CONFIRMED]
+- **Threat/Failure Model**:
+    - **Threat**: Misinformation/Drift leading to dangerous routing. [CONFIRMED]
+    - **Threat**: System-gated alerts (DEFCON 1-2) causing delay in human-verified panic response. [ASSUMED]
+    - **Failure**: Server downtime leading to "stale" intel (handled by 72h grey-out logic). [CONFIRMED]
+
+### 8.2. DESIGN PHILOSOPHY & PRINCIPLES
+- **Core Principles**:
+    - **Safety over Speed**: High-severity alerts require human verification (HITL). [CONFIRMED]
+    - **Privacy First (PDPA)**: Ephemeral ID rotation every 24 hours. [CONFIRMED]
+    - **Offline-First**: Mobile app must handle null/no-internet states gracefully. [CONFIRMED]
+    - **Sovereignty**: Control of data within restricted zones (Exclusion zones). [CONFIRMED]
+
+### 8.3. BEHAVIORAL CONSTRAINTS & RULES
+- **Hard Rules**:
+    - Never generate intel for points inside Exclusion Zones.
+    - Never display DEFCON 1-2 as "CONFIRMED" without human approval.
+    - Rotate User ID every 24 hours.
+- **Soft Rules**:
+    - Optimize for mobile network latency (Gzip compression Level 6).
+    - Use 5-second timeouts for VPS pings.
+- **Override Conditions**: Admin Portal can manually set `is_certified = True`.
+- **Uncertainty behavior**: System marks as "UNCONFIRMED" and adds "System Warnings" to the summary array.
+
+### 8.4. META-INFORMATION (CRITICAL)
+- **Designer Focus**: Reliability and correctness of the "Human-In-The-Loop" gate.
+- **Success Definition**: Zero civilians entering known hazard zones due to system misinformation.
+- **Under-documented but Critical**: The interplay between `Djongo`, `sqlparse`, and `Django 4.1.13` versions (specific pins are required for Mac Silicon build stability).
+
+---
+
+## 9. System Governance Rules
+**CRITICAL RULE**: This document (`MASTER_DESCRIPTION.md`) is the **Single Source of Truth (SSOT)** for the Sentinel System. It supersedes all other documentation, including the now-deprecated `Context_Window_Copy.txt`. All architectural changes, core identity updates, and metric tracking must be committed directly to this file.
+
+**NAMING STANDARDS**: Strict adherence to [Naming_Conventions.md](Naming_Conventions.md) is required for all new code, database schemas, and API definitions.

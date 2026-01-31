@@ -389,3 +389,4 @@ def api_get_threats(request):
     # REMOVED: Static Backfill of HOTZONES_DATA per User Request (Purge Mock Data)
 
     return JsonResponse({'threats': processed})
+

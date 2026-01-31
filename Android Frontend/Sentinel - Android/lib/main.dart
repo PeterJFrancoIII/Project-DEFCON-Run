@@ -8,6 +8,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
@@ -17,6 +18,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+
+// Jobs v2 Module
+import 'jobs_v2/jobs_v2.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:sentinel_android/services/iap_service.dart';
@@ -36,28 +40,11 @@ String get serverUrl {
 /// If not (timeout/error), uses Localhost (Emulator).
 Future<void> determineServerUrl() async {
   const String vpsUrl = "http://146.190.7.51";
-  const String localUrl =
-      "http://10.0.2.2:8000"; // Correct for Android Emulator
+  final String localUrl = (kIsWeb || Platform.isIOS || Platform.isMacOS)
+      ? "http://127.0.0.1:8000"
+      : "http://10.0.2.2:8000";
 
-  // 1. Try VPS first (Production Priority)
-  // Check /intel/status to ensure backend is actually ready, not just Nginx.
-  try {
-    debugPrint("[INIT] Checking VPS connectivity: $vpsUrl");
-    final response = await http
-        .get(Uri.parse("$vpsUrl/intel/status"))
-        .timeout(const Duration(seconds: 5)); // Increased to 5s for 4G/latency
-    if (response.statusCode == 200) {
-      debugPrint("[INIT] VPS Reached & Healthy. Using PRODUCTION URL.");
-      _activeServerUrl = vpsUrl;
-      return;
-    } else {
-      debugPrint("[INIT] VPS Reached but returned ${response.statusCode}");
-    }
-  } catch (e) {
-    debugPrint("[INIT] VPS Unreachable: $e");
-  }
-
-  // 2. Fallback to Localhost (Dev Mode)
+  // 1. Try Localhost FIRST (For Dev/Debug)
   try {
     debugPrint("[INIT] Checking LOCAL connectivity: $localUrl");
     final response = await http
@@ -70,7 +57,24 @@ Future<void> determineServerUrl() async {
     }
   } catch (_) {}
 
-  // 3. Last Resort: Default to Localhost (safe failover)
+  // 2. Fallback to VPS (Production)
+  try {
+    debugPrint("[INIT] Checking VPS connectivity: $vpsUrl");
+    final response = await http
+        .get(Uri.parse("$vpsUrl/intel/status"))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      debugPrint("[INIT] VPS Reached & Healthy. Using PRODUCTION URL.");
+      _activeServerUrl = vpsUrl;
+      return;
+    } else {
+      debugPrint("[INIT] VPS Reached but returned ${response.statusCode}");
+    }
+  } catch (e) {
+    debugPrint("[INIT] VPS Unreachable: $e");
+  }
+
+  // 3. Last Resort: Default to Localhost
   debugPrint("[INIT] No servers found. Defaulting to Localhost.");
   _activeServerUrl = localUrl;
 }
@@ -176,6 +180,7 @@ class Loc {
     "OUTLOOK": {"en": "FORECAST", "th": "การคาดการณ์", "km": "ការព្យាករណ៍"},
     "MAP": {"en": "MAP", "th": "แผนที่", "km": "ផែនទី"},
     "SYSTEM": {"en": "SYSTEM", "th": "ระบบ", "km": "ប្រព័ន្ធ"},
+    "JOBS": {"en": "JOBS", "th": "งาน", "km": "ការងារ"},
     "SOURCES": {"en": "SOURCES", "th": "แหล่งที่มา", "km": "ប្រភព"},
     "LANGUAGE": {"en": "LANGUAGE", "th": "ภาษา", "km": "ភាសា"},
     "OPERATING_COUNTRY": {
@@ -248,6 +253,148 @@ class Loc {
       "th": "ติดต่อเรา",
       "km": "ទាក់ទង​មក​ពួក​យើង"
     },
+    // --- MISSING KEYS ADDED ---
+    "SITREP_DETAIL": {
+      "en": "SITREP DETAIL",
+      "th": "รายละเอียดรายงาน",
+      "km": "ព័ត៌មានលម្អិត"
+    },
+    "SERVER_GENERATED_INTEL": {
+      "en": "SERVER-GENERATED INTEL REPORT",
+      "th": "รายงานข่าวกรองจากเซิร์ฟเวอร์",
+      "km": "របាយការណ៍ស៊ើបការណ៍ពីម៉ាស៊ីនមេ"
+    },
+    "SOURCE_CITATIONS": {
+      "en": "SOURCE CITATIONS",
+      "th": "อ้างอิงแหล่งที่มา",
+      "km": "ប្រភពឯកសារយោង"
+    },
+    "NO_CITATIONS": {
+      "en": "No citations available.",
+      "th": "ไม่มีข้อมูลอ้างอิง",
+      "km": "មិនមានឯកសារយោង"
+    },
+    "UNCERTIFIED": {
+      "en": "UNCERTIFIED",
+      "th": "ยังไม่รับรอง",
+      "km": "មិនទាន់បញ្ជាក់"
+    },
+    "CERTIFIED": {"en": "CERTIFIED", "th": "รับรองแล้ว", "km": "បានបញ្ជាក់"},
+    "PENDING_VERIFICATION": {
+      "en": "PENDING VERIFICATION",
+      "th": "รอการตรวจสอบ",
+      "km": "កំពុងរង់ចាំការផ្ទៀងផ្ទាត់"
+    },
+    "INTELLIGENCE_REPORT": {
+      "en": "SITUATION REPORT",
+      "th": "รายงานข่าวกรอง",
+      "km": "របាយការណ៍ស៊ើបការណ៍"
+    },
+    "INTELLIGENCE_SUMMARY": {
+      "en": "INTELLIGENCE SUMMARY",
+      "th": "สรุปข่าวกรอง",
+      "km": "សេចក្តីសង្ខេបស៊ើបការណ៍"
+    },
+    "CONFIDENCE": {
+      "en": "CONFIDENCE",
+      "th": "ความเชื่อมั่น",
+      "km": "ទំនុកចិត្ត"
+    },
+    "ANALYST_RATIONALE": {
+      "en": "ANALYST RATIONALE",
+      "th": "เหตุผลของนักวิเคราะห์",
+      "km": "ហេតុផលរបស់អ្នកវិភាគ"
+    },
+    "HISTORICAL_AND_SOURCE": {
+      "en": "HISTORICAL & SOURCE CITATIONS",
+      "th": "ประวัติและแหล่งที่มา",
+      "km": "ប្រវត្តិនិងប្រភព"
+    },
+    "NO_SPECIFIC_CITATIONS": {
+      "en": "No specific citations linked.",
+      "th": "ไม่มีการเชื่อมโยงการอ้างอิง",
+      "km": "មិនមានឯកសារយោងជាក់លាក់"
+    },
+    "NO_INTEL_AVAILABLE": {
+      "en": "No Intel Available",
+      "th": "ไม่มีข้อมูลข่าวกรอง",
+      "km": "មិនមានព័ត៌មាន"
+    },
+    "SYSTEM_DIAGNOSTICS": {
+      "en": "SYSTEM DIAGNOSTICS",
+      "th": "การวินิจฉัยระบบ",
+      "km": "ការធ្វើរោគវិនិច្ឆ័យប្រព័ន្ធ"
+    },
+    "SENTINEL_ID": {
+      "en": "SENTINEL ID",
+      "th": "รหัส SENTINEL",
+      "km": "អត្តសញ្ញាណ SENTINEL"
+    },
+    "VERSION": {"en": "VERSION", "th": "เวอร์ชัน", "km": "កំណែ"},
+    "DATE": {"en": "DATE", "th": "วันที่", "km": "កាលបរិច្ឆេទ"},
+    "ANALYST": {"en": "ANALYST", "th": "นักวิเคราะห์", "km": "អ្នកវិភាគ"},
+    "TRANSLATOR": {"en": "TRANSLATOR", "th": "นักแปล", "km": "អ្នកបកប្រែ"},
+    "DATA_SOURCES": {
+      "en": "DATA SOURCES",
+      "th": "แหล่งข้อมูล",
+      "km": "ប្រភពទិន្នន័យ"
+    },
+    "LAST_UPDATE": {
+      "en": "LAST UPDATE",
+      "th": "อัปเดตล่าสุด",
+      "km": "ការធ្វើបច្ចុប្បន្នភាពចុងក្រោយ"
+    },
+    "VISIT_WEBSITE": {
+      "en": "VISIT WEBSITE",
+      "th": "เยี่ยมชมเว็บไซต์",
+      "km": "ចូលមើលគេហទំព័រ"
+    },
+    "DONATE_BUTTON": {
+      "en": "DONATE (PAYPAL)",
+      "th": "บริจาค (PAYPAL)",
+      "km": "បរិច្ចាគ (PAYPAL)"
+    },
+    "CONTACT_SUPPORT_BUTTON": {
+      "en": "CONTACT SUPPORT",
+      "th": "ติดต่อฝ่ายสนับสนุน",
+      "km": "ទាក់ទងជំនួយ"
+    },
+    "OPEN_WEBSITE": {
+      "en": "Open Sentinel Website <3",
+      "th": "เปิดเว็บไซต์ Sentinel <3",
+      "km": "បើកគេហទំព័រ Sentinel <3"
+    },
+    "DONATE_IAP": {
+      "en": "Donate (Apple In-App Purchase)",
+      "th": "บริจาค (ผ่าน Apple)",
+      "km": "បរិច្ចាគ (Apple In-App)"
+    },
+    "SELECT_AMOUNT": {
+      "en": "Select a donation amount",
+      "th": "เลือกยอดบริจาค",
+      "km": "ជ្រើសរើសចំនួនបរិច្ចាគ"
+    },
+    "IAP_UNAVAILABLE": {
+      "en": "IAP Unavailable",
+      "th": "ไม่สามารถซื้อภายในแอปได้",
+      "km": "មិនអាចទិញក្នុងកម្មវិធីបានទេ"
+    },
+    "IAP_ERROR_MSG": {
+      "en":
+          "In-App Purchases are not available on the Simulator or Products failed to load.",
+      "th": "การซื้อภายในแอปไม่พร้อมใช้งาน",
+      "km": "ការទិញក្នុងកម្មវិធីមិនមានទេ"
+    },
+    "MAIL_APP_UNAVAILABLE": {
+      "en": "Mail App Unavailable",
+      "th": "แอปอีเมลไม่พร้อมใช้งาน",
+      "km": "កម្មវិធីអ៊ីមែលមិនមានទេ"
+    },
+    "COULD_NOT_OPEN_MAIL": {
+      "en": "Could not open mail app",
+      "th": "เปิดแอปอีเมลไม่ได้",
+      "km": "មិនអាចបើកកម្មវិធីអ៊ីមែលបានទេ"
+    }
   };
   static String tr(String key, String lang) =>
       dict[key]?[lang] ?? dict[key]?['en'] ?? key;
@@ -288,16 +435,22 @@ class SitRepEntry {
   final String topic;
   final String summary;
   final String date;
+  final String type;
+  final int confidenceScore;
   const SitRepEntry(
       {required this.id,
       required this.topic,
       required this.summary,
-      required this.date});
+      required this.date,
+      this.type = "General",
+      this.confidenceScore = 0});
   factory SitRepEntry.fromJson(Map<String, dynamic> json) => SitRepEntry(
       id: json['id'] ?? "",
       topic: json['topic'] ?? "Update",
       summary: json['summary'] ?? "",
-      date: json['date'] ?? "");
+      date: json['date'] ?? "",
+      type: json['type'] ?? "General",
+      confidenceScore: json['confidence_score'] ?? 0);
 }
 
 class ForecastEntry {
@@ -593,7 +746,8 @@ class SentinelProvider with ChangeNotifier {
   Future<String> fetchServerLogs() async {
     try {
       // Admin endpoint - secure in prod, open in local dev
-      final url = Uri.parse("$serverUrl/admin/ops/logs?lines=200");
+      final url = Uri.parse(
+          "$serverUrl/admin/ops/logs?lines=200&_t=${DateTime.now().millisecondsSinceEpoch}");
       final response = await http.get(url).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -665,7 +819,9 @@ class SentinelProvider with ChangeNotifier {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await determineServerUrl();
-  await IAPService().initialize();
+  if (!kIsWeb) {
+    await IAPService().initialize();
+  }
   runApp(MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => SentinelProvider())],
       child: const MyApp()));
@@ -853,8 +1009,28 @@ class _LandingPageState extends State<LandingPage> {
 
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url)) {
-      throw Exception('Could not launch $url');
+    try {
+      if (!await launchUrl(url)) {
+        throw Exception('Could not launch $url');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (urlString.startsWith("mailto:")) {
+        showCupertinoDialog(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text("Mail App Unavailable"),
+            content: Text(
+                "Could not open mail app.\nPlease email: ${urlString.replaceFirst('mailto:', '')}"),
+            actions: [
+              CupertinoDialogAction(
+                  child: const Text("OK"), onPressed: () => Navigator.pop(ctx))
+            ],
+          ),
+        );
+      } else {
+        debugPrint("Error launching URL: $e");
+      }
     }
   }
 
@@ -1063,6 +1239,10 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _handleDonate(BuildContext context, String url) {
+    if (kIsWeb) {
+      _launchURL(url);
+      return;
+    }
     if (Platform.isIOS) {
       showCupertinoModalPopup(
         context: context,
@@ -1323,6 +1503,8 @@ class _DashboardPageState extends State<DashboardPage>
           data: data, lang: vm.userLang, pulseAnimation: _pulseAnimation),
       ForecastView(data: data, lang: vm.userLang),
       MapTab(data: data, lang: vm.userLang),
+      // Jobs v2 - Rebuilt with Sentinel theme
+      JobsV2Gate(serverUrl: serverUrl),
       SystemView(vm: vm, data: data)
     ];
 
@@ -1400,8 +1582,11 @@ class _DashboardPageState extends State<DashboardPage>
               label: Loc.tr("OUTLOOK", vm.userLang)),
           BottomNavigationBarItem(
               icon: const Icon(Icons.map), label: Loc.tr("MAP", vm.userLang)),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "SYSTEM"),
+          BottomNavigationBarItem(
+              icon: const Icon(Icons.work), label: Loc.tr("JOBS", vm.userLang)),
+          BottomNavigationBarItem(
+              icon: const Icon(Icons.settings),
+              label: Loc.tr("SYSTEM", vm.userLang)),
         ],
       ),
     );
@@ -1495,7 +1680,8 @@ class SitRepView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("SITREP DETAIL: ${entry.topic.toUpperCase()}",
+                      Text(
+                          "${Loc.tr("SITREP_DETAIL", vm.userLang)}: ${entry.topic.toUpperCase()}",
                           style: const TextStyle(
                               color: Colors.yellow,
                               fontWeight: FontWeight.bold,
@@ -1504,29 +1690,19 @@ class SitRepView extends StatelessWidget {
                       Text(entry.summary,
                           style: const TextStyle(
                               color: Colors.white, height: 1.5)),
-                      const SizedBox(height: 15),
-                      const Text("SERVER-GENERATED INTEL REPORT",
-                          style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2)),
-                      const SizedBox(height: 10),
-                      Text(citations.description,
-                          style: const TextStyle(
-                              color: Colors.white, height: 1.5)),
+                      /* SERVER INTEL REMOVED */
                       const SizedBox(height: 20),
                       const Divider(color: Colors.grey),
                       const SizedBox(height: 15),
-                      const Text("SOURCE CITATIONS",
-                          style: TextStyle(
+                      Text(Loc.tr("SOURCE_CITATIONS", vm.userLang),
+                          style: const TextStyle(
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 2)),
                       const SizedBox(height: 15),
                       if (citations.citations.isEmpty)
-                        const Text("No citations available.",
-                            style: TextStyle(color: Colors.grey)),
+                        Text(Loc.tr("NO_CITATIONS", vm.userLang),
+                            style: const TextStyle(color: Colors.grey)),
                       ...citations.citations.map((c) => ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(c.source,
@@ -1617,7 +1793,9 @@ class SitRepView extends StatelessWidget {
                                   : _getGlobalDefconColor(data.defconStatus)),
                           borderRadius: BorderRadius.circular(4)),
                       child: Text(
-                          !data.isCertified ? "UNCERTIFIED" : "CERTIFIED",
+                          !data.isCertified
+                              ? Loc.tr("UNCERTIFIED", lang)
+                              : Loc.tr("CERTIFIED", lang),
                           style: TextStyle(
                               color: !data.isCertified
                                   ? Colors.white
@@ -1641,7 +1819,7 @@ class SitRepView extends StatelessWidget {
               child: Column(children: [
                 Text(
                     data.defconStatus <= 2 && !data.isCertified
-                        ? "PENDING VERIFICATION"
+                        ? Loc.tr("PENDING_VERIFICATION", lang)
                         : Loc.tr("ACTION_${data.defconStatus}", lang),
                     style: const TextStyle(
                         fontSize: 16,
@@ -1775,9 +1953,9 @@ class SitRepView extends StatelessWidget {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Center(
-                          child: Text("INTELLIGENCE REPORT",
-                              style: TextStyle(
+                      Center(
+                          child: Text(Loc.tr("INTELLIGENCE_REPORT", lang),
+                              style: const TextStyle(
                                   color: Colors.yellow,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14))),
@@ -1804,19 +1982,47 @@ class SitRepView extends StatelessWidget {
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Expanded(
+                                              Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                      color: Colors.blue[900],
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              4)),
                                                   child: Text(
-                                                      "${e.topic.toUpperCase()} // ${e.date}",
+                                                      e.type.toUpperCase(),
                                                       style: const TextStyle(
                                                           color: Colors.white,
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                      overflow: TextOverflow
-                                                          .ellipsis)),
-                                              const Icon(Icons.touch_app,
-                                                  color: Colors.grey, size: 14)
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight
+                                                              .bold))),
+                                              if (e.confidenceScore > 0)
+                                                Text(
+                                                    "${Loc.tr("CONFIDENCE", lang)}: ${e.confidenceScore}%",
+                                                    style: const TextStyle(
+                                                        color: Colors.green,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold))
                                             ]),
+                                        const SizedBox(height: 8),
+                                        Row(children: [
+                                          Expanded(
+                                              child: Text(
+                                                  "${e.topic.toUpperCase()} // ${e.date}",
+                                                  style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                  overflow:
+                                                      TextOverflow.ellipsis)),
+                                          const Icon(Icons.touch_app,
+                                              color: Colors.grey, size: 14)
+                                        ]),
                                         const SizedBox(height: 8),
                                         _buildRichText(e.summary),
                                       ])))))
@@ -1831,8 +2037,8 @@ class SitRepView extends StatelessWidget {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("INTELLIGENCE SUMMARY",
-                          style: TextStyle(
+                      Text(Loc.tr("INTELLIGENCE_SUMMARY", lang),
+                          style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 10,
                               fontWeight: FontWeight.bold)),
@@ -1889,7 +2095,8 @@ class ForecastView extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("ANALYST RATIONALE: ${entry.topic.toUpperCase()}",
+                      Text(
+                          "${Loc.tr("ANALYST_RATIONALE", vm.userLang)}: ${entry.topic.toUpperCase()}",
                           style: const TextStyle(
                               color: Colors.yellow,
                               fontWeight: FontWeight.bold,
@@ -1901,15 +2108,15 @@ class ForecastView extends StatelessWidget {
                       const SizedBox(height: 20),
                       const Divider(color: Colors.grey),
                       const SizedBox(height: 10),
-                      const Text("HISTORICAL & SOURCE CITATIONS",
-                          style: TextStyle(
+                      Text(Loc.tr("HISTORICAL_AND_SOURCE", vm.userLang),
+                          style: const TextStyle(
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                               fontSize: 10)),
                       const SizedBox(height: 10),
                       if (citations.citations.isEmpty)
-                        const Text("No specific citations linked.",
-                            style: TextStyle(
+                        Text(Loc.tr("NO_SPECIFIC_CITATIONS", vm.userLang),
+                            style: const TextStyle(
                                 color: Colors.grey,
                                 fontStyle: FontStyle.italic)),
                       ...citations.citations.map((c) => ListTile(
@@ -1932,7 +2139,7 @@ class ForecastView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data.predictive == null) {
-      return const Center(child: Text("No Intel Available"));
+      return Center(child: Text(Loc.tr("NO_INTEL_AVAILABLE", lang)));
     }
     final pred = data.predictive!;
     return SingleChildScrollView(
@@ -2265,9 +2472,28 @@ class SystemView extends StatelessWidget {
   final IntelDetails data;
   const SystemView({required this.vm, required this.data, super.key});
 
-  Future<void> _launchEmail(String email) async {
+  Future<void> _launchEmail(BuildContext context, String email) async {
     final Uri url = Uri.parse("mailto:$email");
-    if (!await launchUrl(url)) throw Exception('Could not launch $url');
+    try {
+      if (!await launchUrl(url)) {
+        throw Exception('Could not launch $url');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showCupertinoDialog(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: Text(Loc.tr("MAIL_APP_UNAVAILABLE", vm.userLang)),
+            content: Text(
+                "${Loc.tr("COULD_NOT_OPEN_MAIL", vm.userLang)}: $e\nPlease email: $email"),
+            actions: [
+              CupertinoDialogAction(
+                  child: const Text("OK"), onPressed: () => Navigator.pop(ctx))
+            ],
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _launchWeb(String? url) async {
@@ -2281,23 +2507,25 @@ class SystemView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(padding: const EdgeInsets.all(16), children: [
-      const Row(children: [
-        Icon(Icons.dns, color: Colors.green),
-        SizedBox(width: 10),
-        Text("SYSTEM DIAGNOSTICS",
-            style: TextStyle(
+      Row(children: [
+        const Icon(Icons.dns, color: Colors.green),
+        const SizedBox(width: 10),
+        Text(Loc.tr("SYSTEM_DIAGNOSTICS", vm.userLang),
+            style: const TextStyle(
                 fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white))
       ]),
       const SizedBox(height: 20),
-      _sysRow("SENTINEL ID", vm.sentinelID, Colors.green),
-      _sysRow("VERSION", "V173", Colors.white),
-      _sysRow("DATE", "2026-01-03", Colors.white),
-      _sysRow(
-          "ANALYST", data.analystModel ?? "gemini-3-pro-preview", Colors.white),
-      _sysRow("TRANSLATOR", data.translatorModel ?? "gemini-2.5-flash-lite",
+      _sysRow(Loc.tr("SENTINEL_ID", vm.userLang), vm.sentinelID, Colors.green),
+      _sysRow(Loc.tr("VERSION", vm.userLang), "V173", Colors.white),
+      _sysRow(Loc.tr("DATE", vm.userLang), "2026-01-03", Colors.white),
+      _sysRow(Loc.tr("ANALYST", vm.userLang),
+          data.analystModel ?? "gemini-3-pro-preview", Colors.white),
+      _sysRow(Loc.tr("TRANSLATOR", vm.userLang),
+          data.translatorModel ?? "gemini-2.5-flash-lite", Colors.white),
+      _sysRow(Loc.tr("DATA_SOURCES", vm.userLang), "Google RSS, OSINT",
           Colors.white),
-      _sysRow("DATA SOURCES", "Google RSS, OSINT", Colors.white),
-      _sysRow("LAST UPDATE", _formatTime(data.lastUpdated), Colors.white),
+      _sysRow(Loc.tr("LAST_UPDATE", vm.userLang), _formatTime(data.lastUpdated),
+          Colors.white),
       const SizedBox(height: 20),
 
       // WEBSITE
@@ -2308,9 +2536,9 @@ class SystemView extends StatelessWidget {
               decoration: BoxDecoration(
                   color: Colors.blue[900],
                   borderRadius: BorderRadius.circular(8)),
-              child: const Center(
-                  child: Text("VISIT WEBSITE",
-                      style: TextStyle(
+              child: Center(
+                  child: Text(Loc.tr("VISIT_WEBSITE", vm.userLang),
+                      style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1))))),
@@ -2324,9 +2552,9 @@ class SystemView extends StatelessWidget {
               decoration: BoxDecoration(
                   color: Colors.pink[800],
                   borderRadius: BorderRadius.circular(8)),
-              child: const Center(
-                  child: Text("DONATE (PAYPAL)",
-                      style: TextStyle(
+              child: Center(
+                  child: Text(Loc.tr("DONATE_BUTTON", vm.userLang),
+                      style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1))))),
@@ -2334,15 +2562,15 @@ class SystemView extends StatelessWidget {
       const SizedBox(height: 10),
 
       GestureDetector(
-          onTap: () => _launchEmail(_supportEmail),
+          onTap: () => _launchEmail(context, _supportEmail),
           child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8)),
-              child: const Center(
-                  child: Text("CONTACT SUPPORT",
-                      style: TextStyle(
+              child: Center(
+                  child: Text(Loc.tr("CONTACT_SUPPORT_BUTTON", vm.userLang),
+                      style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1)))))
@@ -2382,28 +2610,43 @@ class SystemView extends StatelessWidget {
   }
 
   void _handleDonate(BuildContext context, String url) {
+    if (kIsWeb) {
+      _launchWeb(url);
+      return;
+    }
     if (Platform.isIOS) {
       showCupertinoModalPopup(
         context: context,
         builder: (BuildContext context) => CupertinoActionSheet(
           actions: <CupertinoActionSheetAction>[
             CupertinoActionSheetAction(
-              child: const Text('Open Sentinel Website <3',
-                  style: TextStyle(color: Colors.pink)),
+              child: Text(
+                  Loc.tr(
+                      "OPEN_WEBSITE",
+                      Provider.of<SentinelProvider>(context, listen: false)
+                          .userLang),
+                  style: const TextStyle(color: Colors.pink)),
               onPressed: () {
                 Navigator.pop(context);
                 _launchWeb("https://sentinelcivilianriskanalysis.netlify.app/");
               },
             ),
             CupertinoActionSheetAction(
-              child: const Text('Donate (Apple In-App Purchase)',
-                  style: TextStyle(color: Colors.black)),
+              child: Text(
+                  Loc.tr(
+                      "DONATE_IAP",
+                      Provider.of<SentinelProvider>(context, listen: false)
+                          .userLang),
+                  style: const TextStyle(color: Colors.black)),
               onPressed: () {
                 Navigator.pop(context);
                 showCupertinoModalPopup(
                   context: context,
                   builder: (BuildContext context) => CupertinoActionSheet(
-                    message: const Text('Select a donation amount'),
+                    message: Text(Loc.tr(
+                        "SELECT_AMOUNT",
+                        Provider.of<SentinelProvider>(context, listen: false)
+                            .userLang)),
                     actions: <CupertinoActionSheetAction>[
                       for (final tier in [
                         {
@@ -2437,9 +2680,18 @@ class SystemView extends StatelessWidget {
                               showCupertinoDialog(
                                   context: context,
                                   builder: (ctx) => CupertinoAlertDialog(
-                                          title: const Text("IAP Unavailable"),
-                                          content: const Text(
-                                              "In-App Purchases are not available on the Simulator or Products failed to load."),
+                                          title: Text(Loc.tr(
+                                              "IAP_UNAVAILABLE",
+                                              Provider.of<SentinelProvider>(
+                                                      context,
+                                                      listen: false)
+                                                  .userLang)),
+                                          content: Text(Loc.tr(
+                                              "IAP_ERROR_MSG",
+                                              Provider.of<SentinelProvider>(
+                                                      context,
+                                                      listen: false)
+                                                  .userLang)),
                                           actions: [
                                             CupertinoDialogAction(
                                                 child: const Text("OK"),
@@ -2453,7 +2705,10 @@ class SystemView extends StatelessWidget {
                     cancelButton: CupertinoActionSheetAction(
                       isDefaultAction: true,
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: Text(Loc.tr(
+                          "CANCEL",
+                          Provider.of<SentinelProvider>(context, listen: false)
+                              .userLang)),
                     ),
                   ),
                 );
@@ -2465,7 +2720,10 @@ class SystemView extends StatelessWidget {
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('Cancel'),
+            child: Text(Loc.tr(
+                "CANCEL",
+                Provider.of<SentinelProvider>(context, listen: false)
+                    .userLang)),
           ),
         ),
       );
@@ -2541,3 +2799,4 @@ class DefconListScreen extends StatelessWidget {
         ]));
   }
 }
+

@@ -18,6 +18,8 @@ sh run_public.sh
 *   **Port**: `8000`
 
 ## 2. Mobile Application (Flutter)
+### Testing
+For instructions on running the regression testing suite, please see [REGRESSION_TESTING_README.md](REGRESSION_TESTING_README.md).
 The mobile app runs on both Android and iOS from the same codebase.
 
 ### **Android**
@@ -47,4 +49,8 @@ flutter run
 
 ## Status (Golden Master)
 - **Analyst**: `gemini-3-pro-preview`
-- **Translator**: `gemini-2.5-flash-lite`
+
+## 5. Project Metrics
+- **Total Lines of Code**: ~32,309
+- **Est. Token Cost (Rebuild)**: ~131,000 Tokens (Input)
+- **Last Updated**: 2026-01-20
