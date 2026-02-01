@@ -81,13 +81,13 @@
 
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#zones">
-                    <i class="bi bi-map"></i> Exclusion Zones (Map)
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#live-threats">
+                    <i class="bi bi-radar"></i> Live Threat Matrix
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#live-threats">
-                    <i class="bi bi-radar"></i> Live Threat Matrix
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#zones">
+                    <i class="bi bi-geo-alt"></i> Exclusionary Zones
                 </button>
             </li>
             <li class="nav-item">
@@ -115,13 +115,28 @@
                     <i class="bi bi-briefcase"></i> Jobs Management
                 </button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#db-dashboard">
+                    <i class="bi bi-database-fill-gear"></i> Database Dashboard
+                </button>
+            </li>
 
         </ul>
 
         <div class="tab-content border border-top-0 p-3 card">
 
+            <!-- 0. DASHBOARD TAB -->
+            <div class="tab-pane fade" id="db-dashboard">
+                <div class="row">
+                    <div class="col-12">
+                        <iframe src="/admin/dashboard"
+                            style="width: 100%; height: 80vh; border: none; border-radius: 4px; background: #000;"></iframe>
+                    </div>
+                </div>
+            </div>
+
             <!-- 1. ZONES TAB -->
-            <div class="tab-pane fade show active" id="zones">
+            <div class="tab-pane fade" id="zones">
                 <div class="row">
                     <div class="col-md-9">
                         <div id="map"></div>
@@ -140,7 +155,7 @@
             </div>
 
             <!-- 1.5 LIVE THREATS TAB -->
-            <div class="tab-pane fade" id="live-threats">
+            <div class="tab-pane fade show active" id="live-threats">
                 <div class="row">
                     <div class="col-12">
                         <h5 class="text-danger"><i class="bi bi-activity"></i> Active Kinetic Zones & Threats</h5>
@@ -491,6 +506,12 @@
             });
             map.addControl(drawControl);
             map.on(L.Draw.Event.CREATED, e => drawnItems.addLayer(e.layer));
+
+            // Fix map rendering on tab switch
+            const zonesTab = document.querySelector('button[data-bs-target="#zones"]');
+            zonesTab.addEventListener('shown.bs.tab', function (event) {
+                setTimeout(() => map.invalidateSize(), 100);
+            });
         }
 
         async function loadZones() {
@@ -906,7 +927,10 @@
                 threatMap.invalidateSize();
             });
 
-            // Fetch Data
+            // Load Zip Code DEFCON markers (Territory Centers)
+            await loadZipDefconMarkers(threatMap);
+
+            // Fetch Active Threat Data (Event Zones)
             try {
                 const res = await fetch('/api/admin/threats');
                 const data = await res.json();
@@ -921,11 +945,114 @@
 
                     circle.bindPopup(`
                         <strong style="color:red">${t.name}</strong><br>
+                        DEFCON: <b>${t.defcon || 'N/A'}</b><br>
                         Radius: ${t.radius}m<br>
                         Last Event: ${t.last_kinetic || 'Unknown'}
                     `);
                 });
             } catch (e) { console.error("Threat Map Error", e); }
+        }
+
+        async function loadZipDefconMarkers(threatMap) {
+            // Load DEFCON ratings for each known zip code territory
+            try {
+                const res = await fetch('/api/admin/zip-defcon');
+                const data = await res.json();
+
+                (data.zip_defcons || []).forEach(z => {
+                    if (!z.lat || !z.lon) return; // Skip if no coordinates
+
+                    const defconColor = z.defcon <= 2 ? 'red' : (z.defcon <= 3 ? '#ffcc00' : 'green');
+                    const defconIcon = L.divIcon({
+                        className: 'zip-defcon-icon',
+                        html: `<div style="background: ${defconColor}; color: white; border: 2px solid rgba(255,255,255,0.7); border-radius: 50%; width: 18px; height: 18px; text-align: center; line-height: 16px; font-weight: bold; font-family: monospace; font-size: 9px; box-shadow: 0 0 3px rgba(0,0,0,0.5); opacity: 0.85; cursor: pointer;">${z.defcon}</div>`,
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9]
+                    });
+
+                    const marker = L.marker([z.lat, z.lon], { icon: defconIcon, zIndexOffset: 500 })
+                        .addTo(threatMap);
+
+                    // Click handler to load and display SITREP
+                    marker.on('click', async () => {
+                        marker.unbindPopup();
+                        marker.bindPopup('<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading SITREP...</div>').openPopup();
+
+                        try {
+                            const sitrepRes = await fetch(`/api/admin/sitrep?zip=${z.zip_code}`);
+                            const sitrepData = await sitrepRes.json();
+
+                            if (sitrepData.status === 'success' && sitrepData.sitrep) {
+                                const s = sitrepData.sitrep;
+                                const certBadge = s.is_certified ? '<span class="badge bg-success">CERTIFIED</span>' : '<span class="badge bg-warning text-dark">UNVERIFIED</span>';
+                                const defconBadge = `<span class="badge" style="background: ${defconColor};">DEFCON ${s.defcon_status}</span>`;
+
+                                // Build summary HTML
+                                let summaryHtml = '';
+                                if (s.summary && s.summary.length > 0) {
+                                    summaryHtml = '<hr><strong>Summary:</strong><ul style="margin:0; padding-left: 15px; font-size: 11px;">';
+                                    s.summary.slice(0, 5).forEach(item => {
+                                        summaryHtml += `<li>${item}</li>`;
+                                    });
+                                    summaryHtml += '</ul>';
+                                }
+
+                                // Roads to avoid
+                                let roadsHtml = '';
+                                if (s.roads_to_avoid && s.roads_to_avoid.length > 0) {
+                                    roadsHtml = '<hr><strong style="color: orange;">⚠ Roads to Avoid:</strong><ul style="margin:0; padding-left: 15px; font-size: 11px;">';
+                                    s.roads_to_avoid.slice(0, 3).forEach(r => {
+                                        const roadName = typeof r === 'string' ? r : (r.name || r.road || JSON.stringify(r));
+                                        roadsHtml += `<li>${roadName}</li>`;
+                                    });
+                                    roadsHtml += '</ul>';
+                                }
+
+                                // Evacuation point
+                                let evacHtml = '';
+                                if (s.evacuation_point && s.evacuation_point.name) {
+                                    evacHtml = `<hr><strong style="color: cyan;">🏥 Evacuation:</strong> ${s.evacuation_point.name}`;
+                                    if (s.evacuation_point.distance_km) {
+                                        evacHtml += ` (${s.evacuation_point.distance_km} km)`;
+                                    }
+                                }
+
+                                // Predictive
+                                let predictHtml = '';
+                                if (s.predictive && s.predictive.forecast_trend) {
+                                    predictHtml = `<hr><strong>Forecast:</strong> ${s.predictive.forecast_trend} (Risk: ${s.predictive.risk_probability || 'N/A'}%)`;
+                                }
+
+                                const popupContent = `
+                                    <div style="max-width: 350px; max-height: 400px; overflow-y: auto;">
+                                        <h6 style="margin: 0 0 5px 0; border-bottom: 1px solid #444; padding-bottom: 5px;">
+                                            ${s.location_name || 'Zip: ' + z.zip_code}
+                                        </h6>
+                                        <div style="margin-bottom: 5px;">${defconBadge} ${certBadge}</div>
+                                        <small class="text-muted">Updated: ${s.last_updated || 'Unknown'}</small>
+                                        ${summaryHtml}
+                                        ${roadsHtml}
+                                        ${evacHtml}
+                                        ${predictHtml}
+                                    </div>
+                                `;
+
+                                marker.unbindPopup();
+                                marker.bindPopup(popupContent, { maxWidth: 400 }).openPopup();
+                            } else {
+                                marker.unbindPopup();
+                                marker.bindPopup(`<b>Zip: ${z.zip_code}</b><br>DEFCON: ${z.defcon}<br>${z.district || ''}<br><small class="text-muted">No detailed SITREP available</small>`).openPopup();
+                            }
+                        } catch (err) {
+                            console.error('SITREP fetch error:', err);
+                            marker.unbindPopup();
+                            marker.bindPopup(`<b>Zip: ${z.zip_code}</b><br>DEFCON: ${z.defcon}<br><small class="text-danger">Error loading SITREP</small>`).openPopup();
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error("Zip DEFCON Map Error", e);
+            }
         }
 
     </script>

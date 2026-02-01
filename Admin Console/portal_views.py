@@ -15,6 +15,7 @@ import qrcode
 import io
 import base64
 from core.db_utils import get_db_handle
+from django.views.decorators.clickjacking import xframe_options_exempt
 
 # --- CONFIGURATIONPaths ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -101,7 +102,12 @@ def admin_home(request):
 
     return render(request, 'admin_portal.html')
 
-# --- API: ZONES ---
+@login_required(login_url='/admin/login')
+@xframe_options_exempt
+def admin_db_dashboard(request):
+    """Renders the database dashboard."""
+    if not request.user.is_staff: return redirect('admin_login')
+    return render(request, 'db_dashboard.html')
 
 # --- API: ZONES ---
 
@@ -140,8 +146,6 @@ def api_save_zones(request):
             return JsonResponse({'status': 'success'})
         except Exception as e: return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'POST required'}, status=400)
-
-# --- API: INTELLIGENCE (Prompt, OSINT, Zips) ---
 
 # --- API: INTELLIGENCE (Prompt, OSINT, Zips) ---
 
@@ -203,8 +207,6 @@ def api_search_zips(request):
                 count += 1
                 if count > 50: break
     return JsonResponse({'results': results})
-
-# --- API: ASSETS & CONFIG (Contact, Logos, API Key) ---
 
 # --- API: ASSETS & CONFIG (Contact, Logos, API Key) ---
 
@@ -270,8 +272,6 @@ def api_save_config(request):
         with open(get_config_path(), 'w') as f: json.dump(payload, f, indent=4)
         return JsonResponse({'status': 'saved'})
     return JsonResponse({'error': 'POST required'})
-
-# --- API: ALERTS & APPROVALS ---
 
 # --- API: ALERTS & APPROVALS ---
 
@@ -353,14 +353,17 @@ def api_get_threats(request):
     # 1. Fetch from DB (Live Intel)
     try:
         db = get_db_handle()
-        # Get all tactical overlays from English docs
-        cursor = db.intel_history.find({}, {"languages.en.tactical_overlays": 1, "_id": 0})
+        # Get all tactical overlays AND Defcon Status from English docs
+        cursor = db.intel_history.find({}, {"languages.en.tactical_overlays": 1, "languages.en.defcon_status": 1, "_id": 0})
         
         # Build Set of Mock Names to Ignore
         mock_names = {z['name'] for z in HOTZONES_DATA}
         
         for doc in cursor:
-            overlays = doc.get('languages', {}).get('en', {}).get('tactical_overlays', [])
+            lang_data = doc.get('languages', {}).get('en', {})
+            overlays = lang_data.get('tactical_overlays', [])
+            defcon = lang_data.get('defcon_status', 5) # Default to Peace
+            
             for ov in overlays:
                 # Normalize name for deduplication
                 name = ov.get('name', 'Unknown')
@@ -381,7 +384,8 @@ def api_get_threats(request):
                     "lon": ov.get('lon'),
                     "radius": radius,
                     "type": ov.get('type', 'Conflict Zone'),
-                    "last_kinetic": ov.get('date', 'Unknown') # DB uses 'date' often
+                    "last_kinetic": ov.get('date', 'Unknown'),
+                    "defcon": defcon
                 })
     except Exception as e:
         print(f"Error fetching DB threats: {e}")
@@ -389,4 +393,106 @@ def api_get_threats(request):
     # REMOVED: Static Backfill of HOTZONES_DATA per User Request (Purge Mock Data)
 
     return JsonResponse({'threats': processed})
+
+
+@login_required
+def api_get_sitrep(request):
+    """Return full SITREP data for a specific zip code."""
+    zip_code = request.GET.get('zip')
+    if not zip_code:
+        return JsonResponse({'error': 'Missing zip parameter'}, status=400)
+    
+    db = get_db_handle()
+    doc = db.intel_history.find_one(
+        {"zip_code": zip_code},
+        {"_id": 0}
+    )
+    
+    if not doc:
+        return JsonResponse({'error': 'No intel data for this zip code', 'zip_code': zip_code}, status=404)
+    
+    lang_data = doc.get('languages', {}).get('en', {})
+    
+    # Build SITREP response
+    sitrep = {
+        'zip_code': zip_code,
+        'location_name': lang_data.get('location_name', 'Unknown Location'),
+        'defcon_status': lang_data.get('defcon_status', 5),
+        'is_certified': lang_data.get('is_certified', True),
+        'last_updated': lang_data.get('last_updated', 'Unknown'),
+        'summary': lang_data.get('summary', []),
+        'sitrep_entries': lang_data.get('sitrep_entries', []),
+        'roads_to_avoid': lang_data.get('roads_to_avoid', []),
+        'emergency_avoid_locations': lang_data.get('emergency_avoid_locations', []),
+        'evacuation_point': lang_data.get('evacuation_point', {}),
+        'predictive': lang_data.get('predictive', {}),
+        'tactical_overlays': lang_data.get('tactical_overlays', [])
+    }
+    
+    return JsonResponse({'status': 'success', 'sitrep': sitrep})
+
+
+@login_required
+def api_get_zip_defcon(request):
+    """Return DEFCON status only for zip codes with actual intel data in DB."""
+    db = get_db_handle()
+    
+    # Get all zip codes with intel from DB
+    cursor = db.intel_history.find(
+        {"zip_code": {"$exists": True}},
+        {"zip_code": 1, "languages.en.defcon_status": 1, "_id": 0}
+    )
+    
+    # Build map of zip codes that have intel data
+    zip_defcons = {}
+    for doc in cursor:
+        zc = str(doc.get('zip_code', ''))
+        if not zc:
+            continue
+        defcon = doc.get('languages', {}).get('en', {}).get('defcon_status', 5)
+        zip_defcons[zc] = defcon
+    
+    # If no intel data exists, return empty (no simulated markers)
+    if not zip_defcons:
+        return JsonResponse({'zip_defcons': []})
+    
+    # Load postal codes CSV for coordinates - ONLY for zip codes that have intel data
+    results = []
+    seen_zips = set()
+    csv_path = get_zips_path()
+    
+    if os.path.exists(csv_path):
+        with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                zip_code = row.get('POSTAL_CODE', '')
+                
+                # FILTER: Only include zip codes that have actual intel data
+                if zip_code not in zip_defcons:
+                    continue
+                    
+                if zip_code in seen_zips:
+                    continue  # One marker per zip
+                seen_zips.add(zip_code)
+                
+                lat = row.get('LATITUDE')
+                lon = row.get('LONGITUDE')
+                if not lat or not lon:
+                    continue
+                
+                try:
+                    lat = float(lat)
+                    lon = float(lon)
+                except:
+                    continue
+                
+                results.append({
+                    'zip_code': zip_code,
+                    'lat': lat,
+                    'lon': lon,
+                    'defcon': zip_defcons[zip_code],
+                    'district': row.get('DISTRICT_ENGLISH', '')
+                })
+    
+    return JsonResponse({'zip_defcons': results})
 

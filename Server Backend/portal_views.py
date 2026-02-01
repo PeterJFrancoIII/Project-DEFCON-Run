@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 import json
 import os
 import csv
@@ -51,6 +52,10 @@ def admin_login(request):
             # Check 2FA
             if not TOTPDevice.objects.filter(user=user, confirmed=True).exists():
                 return redirect('setup_2fa')
+            
+            # Follow 'next' if safe, otherwise home
+            next_url = request.GET.get('next') or request.POST.get('next')
+            if next_url: return redirect(next_url)
             return redirect('admin_home')
         else:
             return render(request, 'login.html', {'error': 'Invalid Credentials'})
@@ -100,6 +105,15 @@ def admin_home(request):
         pass 
 
     return render(request, 'admin_portal.html')
+
+from django.views.decorators.clickjacking import xframe_options_exempt
+
+@login_required(login_url='/admin/login')
+@xframe_options_exempt
+def admin_db_dashboard(request):
+    """Renders the database dashboard."""
+    if not request.user.is_staff: return redirect('admin_login')
+    return render(request, 'db_dashboard.html')
 
 # --- API: ZONES ---
 
@@ -332,7 +346,6 @@ def api_save_alert_map(request):
     return JsonResponse({'error': 'POST'})
 
 # --- API: LIVE THREATS MAP ---
-from core.geo_utils import HOTZONES_DATA
 
 @login_required
 def api_get_threats(request):
@@ -354,10 +367,7 @@ def api_get_threats(request):
     try:
         db = get_db_handle()
         # Get all tactical overlays from English docs
-        cursor = db.intel_history.find({}, {"languages.en.tactical_overlays": 1, "_id": 0})
-        
-        # Build Set of Mock Names to Ignore
-        mock_names = {z['name'] for z in HOTZONES_DATA}
+        cursor = db.intel_history.find({}, {"languages.en.tactical_overlays": 1, "languages.en.defcon_status": 1, "_id": 0})
         
         for doc in cursor:
             overlays = doc.get('languages', {}).get('en', {}).get('tactical_overlays', [])
@@ -365,8 +375,7 @@ def api_get_threats(request):
                 # Normalize name for deduplication
                 name = ov.get('name', 'Unknown')
                 
-                # FILTER: Skip if this is a known Mock/Static zone
-                if name in mock_names: continue
+                # Logic: Removed static filter per user request (Show all DB threats)
                 
                 if name in seen_names: continue
                 
@@ -381,6 +390,7 @@ def api_get_threats(request):
                     "lon": ov.get('lon'),
                     "radius": radius,
                     "type": ov.get('type', 'Conflict Zone'),
+                    "defcon": doc.get('languages', {}).get('en', {}).get('defcon_status', 'N/A'),
                     "last_kinetic": ov.get('date', 'Unknown') # DB uses 'date' often
                 })
     except Exception as e:
@@ -389,4 +399,106 @@ def api_get_threats(request):
     # REMOVED: Static Backfill of HOTZONES_DATA per User Request (Purge Mock Data)
 
     return JsonResponse({'threats': processed})
+
+
+@login_required
+def api_get_sitrep(request):
+    """Return full SITREP data for a specific zip code."""
+    zip_code = request.GET.get('zip')
+    if not zip_code:
+        return JsonResponse({'error': 'Missing zip parameter'}, status=400)
+    
+    db = get_db_handle()
+    doc = db.intel_history.find_one(
+        {"zip_code": zip_code},
+        {"_id": 0}
+    )
+    
+    if not doc:
+        return JsonResponse({'error': 'No intel data for this zip code', 'zip_code': zip_code}, status=404)
+    
+    lang_data = doc.get('languages', {}).get('en', {})
+    
+    # Build SITREP response
+    sitrep = {
+        'zip_code': zip_code,
+        'location_name': lang_data.get('location_name', 'Unknown Location'),
+        'defcon_status': lang_data.get('defcon_status', 5),
+        'is_certified': lang_data.get('is_certified', True),
+        'last_updated': lang_data.get('last_updated', 'Unknown'),
+        'summary': lang_data.get('summary', []),
+        'sitrep_entries': lang_data.get('sitrep_entries', []),
+        'roads_to_avoid': lang_data.get('roads_to_avoid', []),
+        'emergency_avoid_locations': lang_data.get('emergency_avoid_locations', []),
+        'evacuation_point': lang_data.get('evacuation_point', {}),
+        'predictive': lang_data.get('predictive', {}),
+        'tactical_overlays': lang_data.get('tactical_overlays', [])
+    }
+    
+    return JsonResponse({'status': 'success', 'sitrep': sitrep})
+
+
+@login_required
+def api_get_zip_defcon(request):
+    """Return DEFCON status only for zip codes with actual intel data in DB."""
+    db = get_db_handle()
+    
+    # Get all zip codes with intel from DB
+    cursor = db.intel_history.find(
+        {"zip_code": {"$exists": True}},
+        {"zip_code": 1, "languages.en.defcon_status": 1, "_id": 0}
+    )
+    
+    # Build map of zip codes that have intel data
+    zip_defcons = {}
+    for doc in cursor:
+        zc = str(doc.get('zip_code', ''))
+        if not zc:
+            continue
+        defcon = doc.get('languages', {}).get('en', {}).get('defcon_status', 5)
+        zip_defcons[zc] = defcon
+    
+    # If no intel data exists, return empty (no simulated markers)
+    if not zip_defcons:
+        return JsonResponse({'zip_defcons': []})
+    
+    # Load postal codes CSV for coordinates - ONLY for zip codes that have intel data
+    results = []
+    seen_zips = set()
+    csv_path = get_zips_path()
+    
+    if os.path.exists(csv_path):
+        with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                zip_code = row.get('POSTAL_CODE', '')
+                
+                # FILTER: Only include zip codes that have actual intel data
+                if zip_code not in zip_defcons:
+                    continue
+                    
+                if zip_code in seen_zips:
+                    continue  # One marker per zip
+                seen_zips.add(zip_code)
+                
+                lat = row.get('LATITUDE')
+                lon = row.get('LONGITUDE')
+                if not lat or not lon:
+                    continue
+                
+                try:
+                    lat = float(lat)
+                    lon = float(lon)
+                except:
+                    continue
+                
+                results.append({
+                    'zip_code': zip_code,
+                    'lat': lat,
+                    'lon': lon,
+                    'defcon': zip_defcons[zip_code],
+                    'district': row.get('DISTRICT_ENGLISH', '')
+                })
+    
+    return JsonResponse({'zip_defcons': results})
 

@@ -25,6 +25,7 @@ urlpatterns = [
     # --- ADMIN PORTAL ---
     path('django_admin/', admin.site.urls), # Standard Django Admin (Restored)
     path('admin_portal', admin_views.admin_home, name='admin_home'),
+    path('admin/dashboard', admin_views.admin_db_dashboard, name='admin_db_dashboard'), # NEW
     path('admin/', admin_views.admin_home, name='admin_root'), # Fix for /admin/ 404
     path('admin/login', admin_views.admin_login, name='admin_login'),
     path('admin/logout', admin_views.admin_logout, name='admin_logout'),
@@ -57,6 +58,8 @@ urlpatterns = [
     path('api/admin/alerts', admin_views.api_get_active_alerts, name='api_get_active_alerts'),
     path('api/admin/alerts/save', admin_views.api_save_alert_map, name='api_save_alert_map'),
     path('api/admin/threats', admin_views.api_get_threats, name='api_get_threats'),
+    path('api/admin/zip-defcon', admin_views.api_get_zip_defcon, name='api_get_zip_defcon'),
+    path('api/admin/sitrep', admin_views.api_get_sitrep, name='api_get_sitrep'),
     path('admin/verify', views.admin_verify_threat, name='admin_verify_threat'), # MANUAL OVERRIDE
 
     # --- DEBUG: ATLAS G3 (From Conor) ---
